@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en" style="height: 100%; width: 100%; margin: 0; padding: 0;">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Your Learning Portal</title>
+    
+    <!-- External Libraries -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Custom Styles -->
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body, #root {
+        height: 100% !important;
+        width: 100% !important;
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        overflow-x: hidden;
+      }
+      .bg-slide {
+        transition: opacity 1.2s ease-in-out, transform 10s ease-out;
+      }
+    </style>
+  </head>
+  <body class="bg-slate-100 text-slate-800">
+    <div id="root" class="w-full h-full"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
