@@ -6,7 +6,6 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// 🔊 Sound Effects System
 const playSoundEffect = (type) => {
   try {
     let soundUrl = '';
@@ -33,7 +32,6 @@ export default function App() {
 
   const [clQuota, setClQuota] = useState(() => Number(localStorage.getItem('ylp_cl_quota')) || 12);
   
-  // Year-wise Carry Forward State
   const [carryForwardHistory, setCarryForwardHistory] = useState(() => {
     const saved = localStorage.getItem('ylp_cl_carry_history');
     return saved ? JSON.parse(saved) : [
@@ -438,7 +436,7 @@ export default function App() {
   if (hrActionState) {
     return (
       <div className="min-h-screen w-full flex items-center justify-center bg-slate-950 p-4 font-sans">
-        <div className="max-w-md w-full bg-white rounded-3xl p-6 md:p-8 text-center shadow-2xl border border-slate-800">
+        <div className="max-w-md w-full bg-white rounded-3xl p-6 text-center shadow-2xl border border-slate-800">
           {hrActionState === 'processing' && (
             <div className="py-8">
               <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
@@ -490,8 +488,8 @@ export default function App() {
   if (!isLoggedIn) {
     return (
       <div className="min-h-screen w-full flex items-center justify-center bg-slate-950 p-4 relative overflow-y-auto">
-        <div className="w-full max-w-4xl min-h-[500px] bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col md:flex-row border border-slate-800 relative z-10 my-auto">
-          <div className="w-full md:w-1/2 relative bg-indigo-950 flex flex-col justify-between p-6 md:p-10 text-white overflow-hidden min-h-[220px] md:min-h-full">
+        <div className="w-full max-w-4xl bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col md:flex-row border border-slate-800 relative z-10 my-auto">
+          <div className="w-full md:w-1/2 relative bg-indigo-950 flex flex-col justify-between p-6 md:p-10 text-white overflow-hidden min-h-[220px]">
             {bgImages.map((img, i) => (
               <div
                 key={i}
@@ -564,7 +562,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen w-full flex flex-col md:flex-row bg-slate-100 font-sans">
+    <div className="min-h-screen w-full flex flex-col md:flex-row bg-slate-100 font-sans overflow-x-hidden">
       {showSuccessModal && currentMailData && (
         <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl p-6 max-w-lg w-full shadow-2xl border border-slate-100">
@@ -596,15 +594,15 @@ export default function App() {
         </div>
       )}
 
-      {/* Responsive Navigation Sidebar / Top Header */}
-      <aside className="w-full md:w-64 lg:w-72 bg-slate-900 text-slate-300 flex flex-col justify-between shrink-0">
+      {/* Responsive Header / Navigation Bar */}
+      <aside className="w-full md:w-64 bg-slate-900 text-slate-300 flex flex-col justify-between shrink-0">
         <div>
-          <div className="p-4 md:p-6 border-b border-slate-800 flex items-center justify-between md:justify-start gap-3">
+          <div className="p-4 border-b border-slate-800 flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 md:w-10 md:h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white font-black text-lg shadow-lg">Y</div>
+              <div className="w-9 h-9 bg-indigo-600 rounded-xl flex items-center justify-center text-white font-black text-lg shadow-lg">Y</div>
               <div>
-                <h1 className="font-extrabold text-white text-sm md:text-base leading-tight">Your Learning</h1>
-                <span className="text-[10px] md:text-xs text-indigo-400 font-medium">Portal System</span>
+                <h1 className="font-extrabold text-white text-sm leading-tight">Your Learning</h1>
+                <span className="text-[10px] text-indigo-400 font-medium">Portal System</span>
               </div>
             </div>
             
@@ -616,22 +614,22 @@ export default function App() {
             </button>
           </div>
           
-          <nav className="p-2 md:p-4 flex md:flex-col overflow-x-auto gap-1 md:gap-2">
+          <nav className="p-2 md:p-4 flex md:flex-col overflow-x-auto gap-1">
             <button 
               onClick={() => setActiveTab('dashboard')}
-              className={`whitespace-nowrap flex-1 md:w-full flex items-center justify-center md:justify-start gap-2 md:gap-3 px-3.5 py-2.5 md:py-3.5 rounded-xl text-xs md:text-sm font-bold transition ${activeTab === 'dashboard' ? 'bg-indigo-600 text-white shadow-lg' : 'hover:bg-slate-800 text-slate-400'}`}
+              className={`whitespace-nowrap flex-1 md:w-full flex items-center justify-center md:justify-start gap-2 px-3 py-2.5 rounded-xl text-xs font-bold transition ${activeTab === 'dashboard' ? 'bg-indigo-600 text-white shadow-lg' : 'hover:bg-slate-800 text-slate-400'}`}
             >
               📊 <span>Dashboard</span>
             </button>
             <button 
               onClick={() => setActiveTab('calendar')}
-              className={`whitespace-nowrap flex-1 md:w-full flex items-center justify-center md:justify-start gap-2 md:gap-3 px-3.5 py-2.5 md:py-3.5 rounded-xl text-xs md:text-sm font-bold transition ${activeTab === 'calendar' ? 'bg-indigo-600 text-white shadow-lg' : 'hover:bg-slate-800 text-slate-400'}`}
+              className={`whitespace-nowrap flex-1 md:w-full flex items-center justify-center md:justify-start gap-2 px-3 py-2.5 rounded-xl text-xs font-bold transition ${activeTab === 'calendar' ? 'bg-indigo-600 text-white shadow-lg' : 'hover:bg-slate-800 text-slate-400'}`}
             >
               📅 <span>Apply Leave</span>
             </button>
             <button 
               onClick={() => setActiveTab('settings')}
-              className={`whitespace-nowrap flex-1 md:w-full flex items-center justify-center md:justify-start gap-2 md:gap-3 px-3.5 py-2.5 md:py-3.5 rounded-xl text-xs md:text-sm font-bold transition ${activeTab === 'settings' ? 'bg-indigo-600 text-white shadow-lg' : 'hover:bg-slate-800 text-slate-400'}`}
+              className={`whitespace-nowrap flex-1 md:w-full flex items-center justify-center md:justify-start gap-2 px-3 py-2.5 rounded-xl text-xs font-bold transition ${activeTab === 'settings' ? 'bg-indigo-600 text-white shadow-lg' : 'hover:bg-slate-800 text-slate-400'}`}
             >
               ⚙️ <span>Settings</span>
             </button>
@@ -641,44 +639,44 @@ export default function App() {
         <div className="hidden md:block p-4 border-t border-slate-800">
           <button 
             onClick={handleSignOut}
-            className="w-full py-3 bg-red-600/10 hover:bg-red-600 text-red-400 hover:text-white font-bold rounded-xl text-sm transition border border-red-600/20"
+            className="w-full py-2.5 bg-red-600/10 hover:bg-red-600 text-red-400 hover:text-white font-bold rounded-xl text-xs transition border border-red-600/20"
           >
             🚪 Sign Out
           </button>
         </div>
       </aside>
 
-      {/* Main Content View */}
-      <main className="flex-1 w-full p-4 md:p-8 overflow-y-auto">
-        <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-6 md:mb-8 pb-4 border-b border-slate-200">
+      {/* Main Container View */}
+      <main className="flex-1 w-full max-w-full p-4 md:p-8 overflow-y-auto min-w-0">
+        <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-6 pb-4 border-b border-slate-200">
           <div>
-            <h1 className="text-xl md:text-3xl font-extrabold text-slate-900">Welcome, {currentUser.name}</h1>
-            <p className="text-xs md:text-sm text-slate-500 font-semibold mt-0.5">{currentUser.employeeId} | Joined: {currentUser.joiningDate}</p>
+            <h1 className="text-xl md:text-2xl font-extrabold text-slate-900">Welcome, {currentUser.name}</h1>
+            <p className="text-xs text-slate-500 font-semibold mt-0.5">{currentUser.employeeId} | Joined: {currentUser.joiningDate}</p>
           </div>
-          <span className="text-[11px] md:text-xs text-slate-400 font-semibold bg-white px-3 py-1.5 rounded-lg border border-slate-200">
+          <span className="text-[11px] text-slate-400 font-semibold bg-white px-3 py-1.5 rounded-lg border border-slate-200">
             Last Sync: {lastSyncedTime || 'Just now'}
           </span>
         </header>
 
         {/* DASHBOARD TAB */}
         {activeTab === 'dashboard' && (
-          <div className="space-y-6 md:space-y-8">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5">
-              <div className="bg-white p-5 md:p-6 rounded-2xl shadow-sm border border-slate-200">
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
                 <p className="text-xs font-bold text-slate-400 uppercase mb-1">CASUAL LEAVE (CL)</p>
                 <div className="flex justify-between items-end mb-3">
-                  <span className="text-3xl md:text-4xl font-black text-indigo-600">{remainingCL}</span>
-                  <span className="text-[11px] md:text-xs text-slate-400 font-semibold">of {totalAvailableCL} Total</span>
+                  <span className="text-3xl font-black text-indigo-600">{remainingCL}</span>
+                  <span className="text-xs text-slate-400 font-semibold">of {totalAvailableCL} Total</span>
                 </div>
                 
                 <div className="border-t border-slate-100 pt-2.5">
-                  <p className="text-[10px] md:text-[11px] font-bold text-slate-400 uppercase mb-1.5">Carry Forward Breakdown:</p>
-                  <div className="flex flex-wrap gap-1.5">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase mb-1.5">Carry Forward Breakdown:</p>
+                  <div className="flex flex-wrap gap-1">
                     {carryForwardHistory.length === 0 ? (
                       <span className="text-xs text-slate-400 italic">No carry forward</span>
                     ) : (
                       carryForwardHistory.map(item => (
-                        <span key={item.id} className="px-2 py-0.5 bg-indigo-50 border border-indigo-100 text-indigo-700 text-[11px] font-bold rounded-md">
+                        <span key={item.id} className="px-2 py-0.5 bg-indigo-50 border border-indigo-100 text-indigo-700 text-[10px] font-bold rounded-md">
                           {item.year}: {item.days}D
                         </span>
                       ))
@@ -687,32 +685,32 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="bg-white p-5 md:p-6 rounded-2xl shadow-sm border border-slate-200">
+              <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
                 <p className="text-xs font-bold text-slate-400 uppercase mb-1">SICK LEAVE (SL)</p>
                 <div className="flex justify-between items-end">
-                  <span className="text-3xl md:text-4xl font-black text-rose-500">{remainingSL}</span>
-                  <span className="text-[11px] md:text-xs text-slate-400 font-semibold">of {slQuota} Days Left</span>
+                  <span className="text-3xl font-black text-rose-500">{remainingSL}</span>
+                  <span className="text-xs text-slate-400 font-semibold">of {slQuota} Days Left</span>
                 </div>
               </div>
 
-              <div className={`p-5 md:p-6 rounded-2xl shadow-sm border ${isSabbaticalEligible ? 'bg-amber-50/50 border-amber-200' : 'bg-slate-100 border-slate-200 opacity-60'}`}>
+              <div className={`p-5 rounded-2xl shadow-sm border ${isSabbaticalEligible ? 'bg-amber-50/50 border-amber-200' : 'bg-slate-100 border-slate-200 opacity-60'}`}>
                 <p className="text-xs font-bold text-amber-700 uppercase mb-1">⭐ SABBATICAL (3 YRS)</p>
                 <div className="flex justify-between items-end">
-                  <span className="text-3xl md:text-4xl font-black text-amber-600">{remainingSabbatical}</span>
+                  <span className="text-3xl font-black text-amber-600">{remainingSabbatical}</span>
                 </div>
               </div>
 
-              <div className="bg-white p-5 md:p-6 rounded-2xl shadow-sm border border-slate-200">
+              <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
                 <p className="text-xs font-bold text-slate-400 uppercase mb-1">TOTAL LEAVES USED</p>
                 <div className="flex justify-between items-end">
-                  <span className="text-3xl md:text-4xl font-black text-emerald-600">{usedCL + usedSL + usedSabbatical}</span>
+                  <span className="text-3xl font-black text-emerald-600">{usedCL + usedSL + usedSabbatical}</span>
                 </div>
               </div>
             </div>
 
             <div className="bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-slate-200">
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
-                <h3 className="text-base md:text-lg font-bold text-slate-800">Leave Application Records</h3>
+                <h3 className="text-base font-bold text-slate-800">Leave Application Records</h3>
                 
                 <button
                   onClick={() => fetchLeaves(true)}
@@ -724,63 +722,61 @@ export default function App() {
                 </button>
               </div>
 
-              <div className="overflow-x-auto -mx-4 md:mx-0">
-                <div className="inline-block min-w-full align-middle px-4 md:px-0">
-                  <table className="min-w-full text-left border-collapse text-xs md:text-sm">
-                    <thead>
-                      <tr className="border-b border-slate-200 text-slate-400 font-bold text-[11px] uppercase">
-                        <th className="py-3 px-3 md:px-4">Type</th>
-                        <th className="py-3 px-3 md:px-4">Date / Range</th>
-                        <th className="py-3 px-3 md:px-4">Days</th>
-                        <th className="py-3 px-3 md:px-4">Reason</th>
-                        <th className="py-3 px-3 md:px-4">Status</th>
-                        <th className="py-3 px-3 md:px-4 text-right">Action</th>
+              <div className="w-full overflow-x-auto">
+                <table className="w-full text-left border-collapse text-xs md:text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-200 text-slate-400 font-bold text-[11px] uppercase">
+                      <th className="py-3 px-3">Type</th>
+                      <th className="py-3 px-3">Date / Range</th>
+                      <th className="py-3 px-3">Days</th>
+                      <th className="py-3 px-3">Reason</th>
+                      <th className="py-3 px-3">Status</th>
+                      <th className="py-3 px-3 text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {appliedLeaves.length === 0 ? (
+                      <tr>
+                        <td colSpan="6" className="py-6 text-center text-slate-400">No leave records found.</td>
                       </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {appliedLeaves.length === 0 ? (
-                        <tr>
-                          <td colSpan="6" className="py-6 text-center text-slate-400">No leave records found.</td>
-                        </tr>
-                      ) : (
-                        appliedLeaves.map(item => (
-                          <tr key={item.id} className="hover:bg-slate-50 transition">
-                            <td className="py-3 px-3 md:px-4 font-bold">
-                              <span className={`px-2 py-0.5 rounded text-[11px] ${item.category === 'CL' ? 'bg-indigo-100 text-indigo-700' : item.category === 'SL' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-800 font-extrabold'}`}>
-                                {item.category}
-                              </span>
-                            </td>
-                            <td className="py-3 px-3 md:px-4 font-semibold text-slate-800 whitespace-nowrap">{item.date_str || item.dateStr}</td>
-                            <td className="py-3 px-3 md:px-4 font-semibold text-slate-600 whitespace-nowrap">{item.days_count || item.daysCount}D</td>
-                            <td className="py-3 px-3 md:px-4 text-slate-500 font-medium max-w-[150px] truncate">{item.reason}</td>
-                            <td className="py-3 px-3 md:px-4">
-                              <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold whitespace-nowrap ${item.status === 'Approved' ? 'bg-emerald-100 text-emerald-800' : item.status === 'Rejected' ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800'}`}>
-                                {item.status}
-                              </span>
-                            </td>
-                            <td className="py-3 px-3 md:px-4 text-right whitespace-nowrap space-x-1">
-                              {item.status === 'Pending HR Approval' && (
-                                <button
-                                  onClick={() => handleSendReminderMail(item)}
-                                  disabled={isSendingMail || reminderSentMap[item.id]}
-                                  className={`px-2 py-1 text-[11px] font-bold rounded-lg border transition ${reminderSentMap[item.id] ? 'bg-slate-100 text-slate-400 border-slate-200' : 'bg-amber-50 text-amber-700 border-amber-300'}`}
-                                >
-                                  {reminderSentMap[item.id] ? 'Sent' : '📩 Remind'}
-                                </button>
-                              )}
-                              <button 
-                                onClick={() => handleDeleteLeave(item.id)}
-                                className="px-2 py-1 text-[11px] font-bold rounded-lg border bg-rose-50 text-rose-600 border-rose-200 transition"
+                    ) : (
+                      appliedLeaves.map(item => (
+                        <tr key={item.id} className="hover:bg-slate-50 transition">
+                          <td className="py-3 px-3 font-bold">
+                            <span className={`px-2 py-0.5 rounded text-[11px] ${item.category === 'CL' ? 'bg-indigo-100 text-indigo-700' : item.category === 'SL' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-800 font-extrabold'}`}>
+                              {item.category}
+                            </span>
+                          </td>
+                          <td className="py-3 px-3 font-semibold text-slate-800 whitespace-nowrap">{item.date_str || item.dateStr}</td>
+                          <td className="py-3 px-3 font-semibold text-slate-600 whitespace-nowrap">{item.days_count || item.daysCount}D</td>
+                          <td className="py-3 px-3 text-slate-500 font-medium max-w-[140px] truncate">{item.reason}</td>
+                          <td className="py-3 px-3">
+                            <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold whitespace-nowrap ${item.status === 'Approved' ? 'bg-emerald-100 text-emerald-800' : item.status === 'Rejected' ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800'}`}>
+                              {item.status}
+                            </span>
+                          </td>
+                          <td className="py-3 px-3 text-right whitespace-nowrap space-x-1">
+                            {item.status === 'Pending HR Approval' && (
+                              <button
+                                onClick={() => handleSendReminderMail(item)}
+                                disabled={isSendingMail || reminderSentMap[item.id]}
+                                className={`px-2 py-1 text-[11px] font-bold rounded-lg border transition ${reminderSentMap[item.id] ? 'bg-slate-100 text-slate-400 border-slate-200' : 'bg-amber-50 text-amber-700 border-amber-300'}`}
                               >
-                                🗑️
+                                {reminderSentMap[item.id] ? 'Sent' : '📩 Remind'}
                               </button>
-                            </td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
+                            )}
+                            <button 
+                              onClick={() => handleDeleteLeave(item.id)}
+                              className="px-2 py-1 text-[11px] font-bold rounded-lg border bg-rose-50 text-rose-600 border-rose-200 transition"
+                            >
+                              🗑️
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>
@@ -788,11 +784,11 @@ export default function App() {
 
         {/* CALENDAR & APPLY LEAVE TAB */}
         {activeTab === 'calendar' && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
-            <div className="lg:col-span-2 bg-white p-5 md:p-6 rounded-2xl shadow-sm border border-slate-200">
-              <h3 className="text-lg md:text-xl font-extrabold text-slate-900 mb-5">Apply Leave Request</h3>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2 bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+              <h3 className="text-lg font-extrabold text-slate-900 mb-5">Apply Leave Request</h3>
 
-              <form onSubmit={handleApplyLeave} className="space-y-4 md:space-y-5">
+              <form onSubmit={handleApplyLeave} className="space-y-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">Leave Category</label>
                   <select 
@@ -883,16 +879,15 @@ export default function App() {
                 <button 
                   type="submit"
                   disabled={isSendingMail}
-                  className="w-full py-3.5 md:py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold rounded-xl shadow-lg transition border border-white/20 text-sm"
+                  className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold rounded-xl shadow-lg transition border border-white/20 text-sm"
                 >
                   {isSendingMail ? 'Sending Mail to HR...' : 'Submit Leave Request & Send Email'}
                 </button>
               </form>
             </div>
 
-            {/* Company Holidays */}
-            <div className="bg-white p-5 md:p-6 rounded-2xl shadow-sm border border-slate-200 space-y-5">
-              <h3 className="text-lg md:text-xl font-extrabold text-slate-900">Company Holidays</h3>
+            <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 space-y-5">
+              <h3 className="text-lg font-extrabold text-slate-900">Company Holidays</h3>
 
               <form onSubmit={handleAddHoliday} className="space-y-3 pb-4 border-b border-slate-200">
                 <input 
@@ -913,7 +908,7 @@ export default function App() {
                 </button>
               </form>
 
-              <div className="space-y-2 max-h-64 md:max-h-80 overflow-y-auto">
+              <div className="space-y-2 max-h-64 overflow-y-auto">
                 {companyHolidays.map(h => (
                   <div key={h.id} className="flex justify-between items-center p-3 bg-slate-50 rounded-xl border border-slate-100">
                     <div>
@@ -935,8 +930,8 @@ export default function App() {
 
         {/* SETTINGS TAB */}
         {activeTab === 'settings' && (
-          <div className="max-w-3xl bg-white p-5 md:p-6 rounded-2xl shadow-sm border border-slate-200 space-y-6">
-            <h3 className="text-lg md:text-xl font-extrabold text-slate-900">Portal Configuration & HR Setup</h3>
+          <div className="max-w-3xl bg-white p-5 rounded-2xl shadow-sm border border-slate-200 space-y-6">
+            <h3 className="text-lg font-extrabold text-slate-900">Portal Configuration & HR Setup</h3>
 
             <div className="space-y-5">
               <div>
@@ -949,7 +944,6 @@ export default function App() {
                 />
               </div>
 
-              {/* Year-Wise Carry Forward Management Section */}
               <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-4">
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-1">
                   <div>
