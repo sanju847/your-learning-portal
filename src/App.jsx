@@ -487,34 +487,48 @@ export default function App() {
 
   if (!isLoggedIn) {
     return (
-      <div className="min-h-screen w-full flex items-center justify-center bg-slate-950 p-4 relative overflow-y-auto">
-        <div className="w-full max-w-4xl bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col md:flex-row border border-slate-800 relative z-10 my-auto">
-          <div className="w-full md:w-1/2 relative bg-indigo-950 flex flex-col justify-between p-6 md:p-10 text-white overflow-hidden min-h-[220px]">
+      <div className="min-h-screen w-full flex items-center justify-center bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-900 p-4 relative overflow-hidden">
+        {/* Decorative Glowing Ambient Lighting */}
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-indigo-600/20 rounded-full filter blur-[120px] pointer-events-none animate-pulse"></div>
+        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-600/20 rounded-full filter blur-[120px] pointer-events-none animate-pulse"></div>
+
+        <div className="w-full max-w-4xl bg-slate-900/80 backdrop-blur-2xl rounded-3xl shadow-2xl overflow-hidden flex flex-col md:flex-row border border-white/10 relative z-10 my-auto">
+          
+          {/* Left Side View with Slow Zoom Image Animation */}
+          <div className="w-full md:w-1/2 relative flex flex-col justify-between p-6 md:p-10 text-white overflow-hidden min-h-[280px] md:min-h-[440px]">
             {bgImages.map((img, i) => (
               <div
                 key={i}
-                className={`bg-slide absolute inset-0 bg-cover bg-center transition-opacity duration-1000 ${i === bgIndex ? 'opacity-40 scale-105' : 'opacity-0 scale-100'}`}
+                className={`absolute inset-0 bg-cover bg-center transition-all duration-1000 transform ${
+                  i === bgIndex 
+                    ? 'opacity-80 scale-110 ease-out duration-[5000ms]' 
+                    : 'opacity-0 scale-100'
+                }`}
                 style={{ backgroundImage: `url(${img})` }}
               />
             ))}
+            
+            {/* Dark Gradient Overlay for Readability */}
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent z-[1]" />
 
             <div className="relative z-10">
-              <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/10 backdrop-blur-md rounded-full text-xs font-semibold mb-3 border border-white/20">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-white/10 backdrop-blur-md rounded-full text-xs font-semibold mb-4 border border-white/20 shadow-lg">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
                 Corporate Workspace
               </div>
-              <h2 className="text-2xl md:text-4xl font-extrabold tracking-tight">Your Learning Portal</h2>
+              <h2 className="text-3xl md:text-4xl font-black tracking-tight drop-shadow-md">Your Learning Portal</h2>
             </div>
 
-            <div className="relative z-10 text-xs text-indigo-300 font-medium mt-4 md:mt-0">
+            <div className="relative z-10 text-xs text-indigo-200 font-semibold tracking-wider uppercase mt-4 md:mt-0 drop-shadow">
               Enterprise Attendance System
             </div>
           </div>
 
-          <div className="w-full md:w-1/2 bg-white p-6 md:p-10 flex flex-col justify-center">
+          {/* Right Side Form View */}
+          <div className="w-full md:w-1/2 bg-white/95 backdrop-blur-xl p-6 md:p-10 flex flex-col justify-center border-t md:border-t-0 md:border-l border-white/20">
             <div className="mb-6">
-              <h3 className="text-2xl md:text-3xl font-extrabold text-slate-900">Sign In</h3>
-              <p className="text-slate-500 text-xs mt-1">Enter credentials for Your Learning Portal</p>
+              <h3 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight">Sign In</h3>
+              <p className="text-slate-500 text-xs font-medium mt-1">Enter credentials for Your Learning Portal</p>
             </div>
 
             {loginError && (
@@ -550,7 +564,7 @@ export default function App() {
 
               <button 
                 type="submit" 
-                className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-500/90 text-white font-bold rounded-xl shadow-lg transition-all border border-white/20 text-sm mt-2"
+                className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl shadow-lg transition-all border border-white/20 text-sm mt-2 hover:shadow-indigo-500/25 active:scale-[0.99]"
               >
                 Access Account
               </button>
