@@ -30,7 +30,7 @@ export default function App() {
   const [loginError, setLoginError] = useState('');
   const [activeTab, setActiveTab] = useState('dashboard');
 
-  // Quota & Carry Forward States (Database synced)
+  // Quota & Carry Forward States
   const [clQuota, setClQuota] = useState(12);
   const [slQuota, setSlQuota] = useState(6);
   const [sabbaticalQuota, setSabbaticalQuota] = useState(30);
@@ -108,7 +108,6 @@ export default function App() {
     }
   };
 
-  // Supabase Portal Settings Fetch
   const fetchPortalSettings = async () => {
     const { data, error } = await supabase.from('settings').select('*').eq('id', 1).maybeSingle();
     if (!error && data) {
@@ -120,7 +119,6 @@ export default function App() {
     }
   };
 
-  // Supabase Portal Settings Save
   const saveSettingsToDB = async (updatedObj) => {
     const payload = {
       id: 1,
@@ -166,14 +164,47 @@ export default function App() {
     }
   };
 
+  // FETCH ATTENDANCE + AUTOMATIC ABSENT ENGINE
   const fetchAttendance = async () => {
     const { data, error } = await supabase.from('attendance').select('*').order('date', { ascending: false });
     if (!error && data) {
       setAttendanceRecords(data);
+      checkAndAutoMarkAbsent(data);
     }
   };
 
-  // EMAIL APPROVAL / REJECTION URL HANDLER WITH SINGLE-ACTION LOCK
+  // AUTO-ABSENT ENGINE: Check past dates & mark Absent if not marked
+  const checkAndAutoMarkAbsent = async (currentRecords) => {
+    const today = new Date();
+    const recordsMap = new Set(currentRecords.map(r => r.date));
+    const newAbsentEntries = [];
+
+    // Check last 7 days for any un-marked working day
+    for (let i = 1; i <= 7; i++) {
+      const pastDate = new Date();
+      pastDate.setDate(today.getDate() - i);
+      const dateStr = pastDate.toISOString().split('T')[0];
+      const dayNum = pastDate.getDay();
+
+      // Skip Weekends (Sunday=0, Saturday=6)
+      if (dayNum !== 0 && dayNum !== 6) {
+        if (!recordsMap.has(dateStr)) {
+          newAbsentEntries.push({
+            date: dateStr,
+            status: 'Absent',
+            type: 'Regular Workday',
+            note: 'Auto-marked Absent (Attendance not submitted)'
+          });
+        }
+      }
+    }
+
+    if (newAbsentEntries.length > 0) {
+      await supabase.from('attendance').upsert(newAbsentEntries, { onConflict: 'date' });
+    }
+  };
+
+  // EMAIL APPROVAL / REJECTION URL HANDLER
   useEffect(() => {
     const handleUrlAction = async () => {
       const urlParams = new URLSearchParams(window.location.search);
@@ -185,7 +216,6 @@ export default function App() {
         const targetStatus = action === 'approve' ? 'Approved' : 'Rejected';
         const leaveId = Number(rawLeaveId);
 
-        // Fetch current status from DB first
         const { data: existingLeave, error: fetchErr } = await supabase
           .from('leaves')
           .select('status')
@@ -197,14 +227,12 @@ export default function App() {
           return;
         }
 
-        // Prevent second action if already processed by HR or Owner
         if (existingLeave.status !== 'Pending HR Approval') {
           setHrActionState('already_done');
           setHrActionDetails({ status: existingLeave.status, leaveId });
           return;
         }
 
-        // Update status if it was pending
         const { error: updateErr } = await supabase
           .from('leaves')
           .update({ status: targetStatus })
@@ -231,7 +259,7 @@ export default function App() {
       const pollInterval = setInterval(() => {
         fetchLeaves(false);
         fetchAttendance();
-      }, 5000);
+      }, 4000);
 
       const channel = supabase
         .channel('schema-db-changes')
@@ -285,6 +313,7 @@ export default function App() {
   const todayStr = new Date().toISOString().split('T')[0];
   const todayRecord = attendanceRecords.find(r => r.date === todayStr);
 
+  // MARK ATTENDANCE ACTION WITH SUPABASE RE-FETCH
   const markTodayAttendance = async () => {
     const today = new Date();
     const dayNum = today.getDay();
@@ -294,14 +323,20 @@ export default function App() {
       date: todayStr,
       status: 'Present',
       type: isWeekend ? 'Extra Weekend Work' : 'Regular Workday',
-      note: isWeekend ? 'Weekend Duty' : 'Standard Present'
+      note: isWeekend ? 'Weekend Duty Log' : 'Standard Present'
     };
 
-    await supabase.from('attendance').upsert([payload], { onConflict: 'date' });
-    fetchAttendance();
-    alert("✓ Today's Attendance Marked Successfully!");
+    const { error } = await supabase.from('attendance').upsert([payload], { onConflict: 'date' });
+    
+    if (!error) {
+      await fetchAttendance();
+      alert("✓ Today's Attendance Marked Successfully!");
+    } else {
+      alert("⚠️ Error updating Database: " + error.message);
+    }
   };
 
+  // LOG EXTRA WORK DAY ACTION WITH SUPABASE RE-FETCH
   const handleAddExtraWork = async (e) => {
     e.preventDefault();
     if (!extraWorkDate) return alert("Select Date");
@@ -313,11 +348,16 @@ export default function App() {
       note: extraWorkReason || 'Overtime / Weekend Work'
     };
 
-    await supabase.from('attendance').upsert([payload], { onConflict: 'date' });
-    setExtraWorkDate('');
-    setExtraWorkReason('');
-    fetchAttendance();
-    alert("Extra Working Day Logged!");
+    const { error } = await supabase.from('attendance').upsert([payload], { onConflict: 'date' });
+    
+    if (!error) {
+      setExtraWorkDate('');
+      setExtraWorkReason('');
+      await fetchAttendance();
+      alert("Extra Working Day Logged!");
+    } else {
+      alert("⚠️ Error saving record: " + error.message);
+    }
   };
 
   const usedCL = appliedLeaves.filter(i => i.category === 'CL' && i.status === 'Approved').reduce((s, i) => s + (i.days_count || 1), 0);
@@ -901,7 +941,7 @@ export default function App() {
           </div>
         )}
 
-        {/* ATTENDANCE TAB */}
+        {/* ATTENDANCE TAB WITH LIVE LOG TABLE & AUTO-ABSENT LABELS */}
         {activeTab === 'attendance' && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2 bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
@@ -918,12 +958,16 @@ export default function App() {
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {attendanceRecords.length === 0 ? (
-                      <tr><td colSpan="4" className="py-4 text-center text-slate-400">No attendance marked yet.</td></tr>
+                      <tr><td colSpan="4" className="py-4 text-center text-slate-400">No attendance records found yet.</td></tr>
                     ) : (
                       attendanceRecords.map(r => (
                         <tr key={r.id || r.date}>
                           <td className="py-3 px-2 font-bold">{r.date}</td>
-                          <td className="py-3 px-2"><span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded font-bold">{r.status}</span></td>
+                          <td className="py-3 px-2">
+                            <span className={`px-2 py-0.5 rounded font-bold ${r.status === 'Present' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>
+                              {r.status}
+                            </span>
+                          </td>
                           <td className="py-3 px-2 font-semibold text-slate-600">{r.type}</td>
                           <td className="py-3 px-2 text-slate-500">{r.note}</td>
                         </tr>
