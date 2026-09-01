@@ -6,6 +6,25 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+// Default Indian Holiday List for 2026
+const DEFAULT_HOLIDAYS_2026 = [
+  { id: 1, date: '2026-01-26', title: 'Republic Day' },
+  { id: 2, date: '2026-03-04', title: 'Maha Shivratri' },
+  { id: 3, date: '2026-03-25', title: 'Holi' },
+  { id: 4, date: '2026-04-02', title: 'Good Friday' },
+  { id: 5, date: '2026-04-14', title: 'Ambedkar Jayanti' },
+  { id: 6, date: '2026-05-01', title: 'May Day' },
+  { id: 7, date: '2026-08-15', title: 'Independence Day' },
+  { id: 8, date: '2026-08-28', title: 'Raksha Bandhan' },
+  { id: 9, date: '2026-09-04', title: 'Janmashtami' },
+  { id: 10, date: '2026-10-02', title: 'Gandhi Jayanti' },
+  { id: 11, date: '2026-10-20', title: 'Dussehra' },
+  { id: 12, date: '2026-11-08', title: 'Diwali' },
+  { id: 13, date: '2026-11-09', title: 'Govardhan Puja' },
+  { id: 14, date: '2026-11-23', title: 'Guru Nanak Jayanti' },
+  { id: 15, date: '2026-12-25', title: 'Christmas' }
+];
+
 const playSoundEffect = (type) => {
   try {
     let soundUrl = '';
@@ -33,6 +52,9 @@ export default function App() {
   // Center Toast Notification & Custom Delete Modal States
   const [toastNotification, setToastNotification] = useState({ show: false, title: '', message: '' });
   const [deleteCandidateDate, setDeleteCandidateDate] = useState(null);
+
+  // Sync Calendar Loader State
+  const [isSyncing, setIsSyncing] = useState(false);
 
   // Blacklist state to stop Auto-Mark Absent from regenerating deleted entries
   const [deletedDates, setDeletedDates] = useState(() => {
@@ -82,12 +104,7 @@ export default function App() {
 
   const [companyHolidays, setCompanyHolidays] = useState(() => {
     const saved = localStorage.getItem('ylp_holidays');
-    return saved ? JSON.parse(saved) : [
-      { id: 1, date: '2026-01-26', title: 'Republic Day' },
-      { id: 2, date: '2026-08-15', title: 'Independence Day' },
-      { id: 3, date: '2026-10-02', title: 'Gandhi Jayanti' },
-      { id: 4, date: '2026-12-25', title: 'Christmas' }
-    ];
+    return saved ? JSON.parse(saved) : DEFAULT_HOLIDAYS_2026;
   });
 
   const [leaveCategory, setLeaveCategory] = useState('CL');
@@ -199,6 +216,21 @@ export default function App() {
     }
   };
 
+  // SYNC CALENDAR HANDLER (Refreshes DB, Holidays & Attendance)
+  const handleSyncCalendar = async () => {
+    setIsSyncing(true);
+    try {
+      await Promise.all([fetchLeaves(false), fetchAttendance(), fetchPortalSettings()]);
+      setCompanyHolidays(DEFAULT_HOLIDAYS_2026);
+      localStorage.setItem('ylp_holidays', JSON.stringify(DEFAULT_HOLIDAYS_2026));
+      triggerToast("Calendar Synced!", "All holidays, leaves & attendance data updated.");
+    } catch (err) {
+      triggerToast("Sync Failed", "Could not sync database records.");
+    } finally {
+      setTimeout(() => setIsSyncing(false), 600);
+    }
+  };
+
   // Fixed Auto-Mark Absent (Honors Deleted Blacklist)
   const checkAndAutoMarkAbsent = async (currentRecords) => {
     const today = new Date();
@@ -213,7 +245,6 @@ export default function App() {
       const dayNum = pastDate.getDay();
 
       if (dayNum !== 0 && dayNum !== 6) {
-        // Only insert if date is NOT in database and NOT manually deleted by user
         if (!recordsMap.has(dateStr) && !savedBlacklist.includes(dateStr)) {
           newAbsentEntries.push({
             date: dateStr,
@@ -354,7 +385,6 @@ export default function App() {
     const { error } = await supabase.from('attendance').upsert([payload], { onConflict: 'date' });
     
     if (!error) {
-      // Remove from blacklist if marked present again
       setDeletedDates(prev => prev.filter(dt => dt !== targetDate));
       await fetchAttendance();
       triggerToast(
@@ -366,21 +396,16 @@ export default function App() {
     }
   };
 
-  // PERMANENT DELETE HANDLER (State + DB + Local Blacklist)
+  // PERMANENT DELETE HANDLER
   const confirmPermanentDelete = async () => {
     if (!deleteCandidateDate) return;
     const dateStr = deleteCandidateDate;
 
-    // 1. Delete from Supabase Database
     const { error } = await supabase.from('attendance').delete().eq('date', dateStr);
     
     if (!error) {
-      // 2. Blacklist date in local state & localStorage so Auto-Absent won't re-create it
       setDeletedDates(prev => [...prev, dateStr]);
-      
-      // 3. Remove date from current local UI state immediately
       setAttendanceRecords(prev => prev.filter(r => r.date !== dateStr));
-      
       setDeleteCandidateDate(null);
       triggerToast("Record Removed", `Attendance entry for ${dateStr} has been deleted permanently.`);
       await fetchAttendance();
@@ -611,16 +636,20 @@ export default function App() {
   const handleAddHoliday = (e) => {
     e.preventDefault();
     if (!holidayDate || !holidayTitle) return alert('Fill both holiday date and title');
-    setCompanyHolidays([...companyHolidays, { id: Date.now(), date: holidayDate, title: holidayTitle }]);
+    const updated = [...companyHolidays, { id: Date.now(), date: holidayDate, title: holidayTitle }];
+    setCompanyHolidays(updated);
+    localStorage.setItem('ylp_holidays', JSON.stringify(updated));
     setHolidayDate('');
     setHolidayTitle('');
   };
 
   const handleDeleteHoliday = (id) => {
-    setCompanyHolidays(companyHolidays.filter(h => h.id !== id));
+    const updated = companyHolidays.filter(h => h.id !== id);
+    setCompanyHolidays(updated);
+    localStorage.setItem('ylp_holidays', JSON.stringify(updated));
   };
 
-  // CALENDAR GENERATOR HELPER
+  // CALENDAR GENERATOR HELPER WITH HOLIDAY BADGES
   const renderInteractiveCalendar = () => {
     const daysInMonth = new Date(calendarViewYear, calendarViewMonth + 1, 0).getDate();
     const firstDayIndex = new Date(calendarViewYear, calendarViewMonth, 1).getDay();
@@ -639,11 +668,13 @@ export default function App() {
       const fullDateStr = `${calendarViewYear}-${formattedMonth}-${formattedDay}`;
 
       const rec = filteredRecords.find(r => r.date === fullDateStr);
+      const holiday = companyHolidays.find(h => h.date === fullDateStr);
       const isToday = fullDateStr === todayStr;
 
       let cellStyle = "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100";
       if (rec?.status === 'Present') cellStyle = "bg-emerald-500 text-white font-black shadow-md shadow-emerald-500/30";
-      if (rec?.status === 'Absent') cellStyle = "bg-rose-500 text-white font-black shadow-md shadow-rose-500/30";
+      else if (rec?.status === 'Absent') cellStyle = "bg-rose-500 text-white font-black shadow-md shadow-rose-500/30";
+      else if (holiday) cellStyle = "bg-indigo-600 text-white font-bold shadow-md shadow-indigo-600/30";
 
       days.push(
         <button
@@ -652,10 +683,11 @@ export default function App() {
             setSelectedCalendarDate(fullDateStr);
             if (dateMode === 'single') setSingleDate(fullDateStr);
           }}
-          className={`h-11 rounded-xl border flex flex-col items-center justify-center transition-all text-xs font-bold relative ${cellStyle} ${isToday ? 'ring-2 ring-indigo-600 ring-offset-1' : ''}`}
+          className={`h-11 rounded-xl border flex flex-col items-center justify-center transition-all text-xs font-bold relative ${cellStyle} ${isToday ? 'ring-2 ring-amber-400 ring-offset-1' : ''}`}
         >
           <span>{day}</span>
-          {rec && <span className="text-[9px] uppercase tracking-tighter opacity-90">{rec.status}</span>}
+          {rec && !holiday && <span className="text-[9px] uppercase tracking-tighter opacity-90">{rec.status}</span>}
+          {holiday && <span className="text-[8px] uppercase tracking-tighter text-amber-200 font-extrabold truncate w-full px-1">{holiday.title}</span>}
         </button>
       );
     }
@@ -847,7 +879,7 @@ export default function App() {
   return (
     <div className="min-h-screen w-full flex flex-col md:flex-row bg-slate-100 font-sans overflow-x-hidden relative">
       
-      {/* --- CENTER CLEAN TOAST NOTIFICATION (NO BOUNCE) --- */}
+      {/* --- CENTER CLEAN TOAST NOTIFICATION --- */}
       {toastNotification.show && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/30 backdrop-blur-xs transition-opacity duration-200">
           <div className="bg-slate-900 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-4 border border-slate-700 max-w-sm">
@@ -862,7 +894,7 @@ export default function App() {
         </div>
       )}
 
-      {/* --- MATCHING CUSTOM DELETE CONFIRMATION MODAL --- */}
+      {/* --- DELETE CONFIRMATION MODAL --- */}
       {deleteCandidateDate && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm transition-all">
           <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl border border-slate-100 text-center">
@@ -987,7 +1019,18 @@ export default function App() {
             <h1 className="text-xl md:text-2xl font-extrabold text-slate-900">Welcome, {currentUser.name}</h1>
             <p className="text-xs text-slate-500 font-semibold mt-0.5">{currentUser.employeeId} | Joined: {currentUser.joiningDate}</p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            
+            {/* SYNC CALENDAR BUTTON */}
+            <button 
+              onClick={handleSyncCalendar}
+              disabled={isSyncing}
+              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition shadow-sm flex items-center gap-1.5"
+            >
+              <span className={isSyncing ? 'animate-spin' : ''}>🔄</span>
+              {isSyncing ? 'Syncing...' : 'Sync Calendar'}
+            </button>
+
             <button 
               onClick={() => handleMarkDateAttendance(todayStr)} 
               disabled={!!todayRecord} 
