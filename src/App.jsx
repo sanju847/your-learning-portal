@@ -173,15 +173,15 @@ export default function App() {
   };
 
   // Leave Deductions
-  const usedCL = appliedLeaves.filter(i => i.category === 'CL').reduce((s, i) => s + i.daysCount, 0);
-  const usedSL = appliedLeaves.filter(i => i.category === 'SL').reduce((s, i) => s + i.daysCount, 0);
-  const usedSabbatical = appliedLeaves.filter(i => i.category === 'Sabbatical').reduce((s, i) => s + i.daysCount, 0);
+  const usedCL = appliedLeaves.filter(i => i.category === 'CL').reduce((s, i) => s + (i.daysCount || i.days_count || 1), 0);
+  const usedSL = appliedLeaves.filter(i => i.category === 'SL').reduce((s, i) => s + (i.daysCount || i.days_count || 1), 0);
+  const usedSabbatical = appliedLeaves.filter(i => i.category === 'Sabbatical').reduce((s, i) => s + (i.daysCount || i.days_count || 1), 0);
 
   const remainingCL = totalAvailableCL - usedCL;
   const remainingSL = slQuota - usedSL;
   const remainingSabbatical = sabbaticalQuota - usedSabbatical;
 
-// Real Email Dispatcher Function
+  // Real Email Dispatcher Function
   const sendRealMailToHR = async (mailPayload) => {
     setIsSendingMail(true);
     
@@ -202,7 +202,7 @@ export default function App() {
             applied_date: mailPayload.sentDate,
             subject: mailPayload.subject,
             message: mailPayload.body,
-            leave_id: mailPayload.leaveId // <-- YE NEW LINE ADD KARNI HAI
+            leave_id: mailPayload.leaveId
           },
           'O5FhcUXl6UTLrRv7n'    // Public Key
         );
@@ -277,8 +277,25 @@ export default function App() {
     if (leaveCategory === 'SL' && count > remainingSL) return alert(`Insufficient SL Balance! Only ${remainingSL} Days Left.`);
     if (leaveCategory === 'Sabbatical' && count > remainingSabbatical) return alert(`Insufficient Sabbatical Balance! Only ${remainingSabbatical} Days Left.`);
 
+    // Push to Supabase Database
+    const { data, error } = await supabase
+      .from('leaves')
+      .insert([
+        {
+          category: leaveCategory,
+          date_str: dateStr,
+          days_count: count,
+          reason: leaveReason || 'Personal Request',
+          status: 'Pending HR Approval'
+        }
+      ])
+      .select();
+
+    const dbRecord = data && data[0] ? data[0] : null;
+    const leaveId = dbRecord ? dbRecord.id : Date.now();
+
     const newRecord = {
-      id: Date.now(),
+      id: leaveId,
       category: leaveCategory,
       dateStr,
       daysCount: count,
@@ -290,7 +307,7 @@ export default function App() {
 
     const mailDraft = {
       id: Date.now(),
-      leaveId: newRecord.id,
+      leaveId: leaveId,
       to: hrEmailAddress,
       category: leaveCategory,
       daysCount: count,
@@ -314,10 +331,12 @@ export default function App() {
 
     triggerPartyPopper();
     setShowSuccessModal(true);
+    fetchLeaves();
   };
 
-  const handleDeleteLeave = (id) => {
+  const handleDeleteLeave = async (id) => {
     if (window.confirm('Remove this leave entry and restore balance?')) {
+      await supabase.from('leaves').delete().eq('id', id);
       setAppliedLeaves(appliedLeaves.filter(i => i.id !== id));
       setEmailLogs(emailLogs.filter(i => i.leaveId !== id));
     }
@@ -598,11 +617,11 @@ export default function App() {
                               {item.category}
                             </span>
                           </td>
-                          <td className="py-3.5 px-4 font-semibold text-slate-800">{item.dateStr}</td>
-                          <td className="py-3.5 px-4 font-semibold text-slate-600">{item.daysCount} Day(s)</td>
+                          <td className="py-3.5 px-4 font-semibold text-slate-800">{item.dateStr || item.date_str}</td>
+                          <td className="py-3.5 px-4 font-semibold text-slate-600">{item.daysCount || item.days_count} Day(s)</td>
                           <td className="py-3.5 px-4 text-slate-500">{item.reason}</td>
                           <td className="py-3.5 px-4">
-                            <span className="px-3 py-1 bg-amber-100 text-amber-800 rounded-full text-xs font-bold">
+                            <span className={`px-3 py-1 rounded-full text-xs font-bold ${item.status === 'Approved' ? 'bg-emerald-100 text-emerald-800' : item.status === 'Rejected' ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800'}`}>
                               {item.status}
                             </span>
                           </td>
@@ -709,21 +728,21 @@ export default function App() {
                     <input 
                       type="date" 
                       required
-                      value={singleDate} 
+                      value={singleDate}
                       onChange={e => setSingleDate(e.target.value)}
-                      className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-600"
+                      className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-semibold"
                     />
                   </div>
                 ) : (
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Start Date</label>
                       <input 
                         type="date" 
                         required
-                        value={startDate} 
+                        value={startDate}
                         onChange={e => setStartDate(e.target.value)}
-                        className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-600"
+                        className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-semibold"
                       />
                     </div>
                     <div>
@@ -731,44 +750,44 @@ export default function App() {
                       <input 
                         type="date" 
                         required
-                        value={endDate} 
+                        value={endDate}
                         onChange={e => setEndDate(e.target.value)}
-                        className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-600"
+                        className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-semibold"
                       />
                     </div>
                   </div>
                 )}
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Reason for Leave</label>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Reason / Remarks</label>
                   <textarea 
                     rows="3"
-                    placeholder="Enter reason..."
+                    placeholder="Enter reason for leave application..."
                     value={leaveReason}
                     onChange={e => setLeaveReason(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-600"
-                  />
+                    className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-semibold"
+                  ></textarea>
                 </div>
 
                 <button 
                   type="submit" 
                   disabled={isSendingMail}
-                  className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl shadow-lg border border-white/20 text-sm transition"
+                  className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl shadow-lg transition text-sm"
                 >
-                  {isSendingMail ? 'Sending Notification...' : 'Submit Request'}
+                  {isSendingMail ? 'Sending Notification Email...' : 'Submit Leave Request'}
                 </button>
               </form>
             </div>
 
-            {/* Company Holidays */}
+            {/* Holidays List */}
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-4">
-              <h3 className="text-lg font-bold text-slate-800 border-b border-slate-100 pb-3">Company Holiday Schedule</h3>
+              <h3 className="text-lg font-bold text-slate-800 border-b border-slate-100 pb-3">Company Holiday Calendar</h3>
               
-              <form onSubmit={handleAddHoliday} className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <form onSubmit={handleAddHoliday} className="flex gap-2">
                 <input 
                   type="date" 
                   required 
-                  value={holidayDate} 
+                  value={holidayDate}
                   onChange={e => setHolidayDate(e.target.value)}
                   className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold"
                 />
@@ -776,28 +795,21 @@ export default function App() {
                   type="text" 
                   placeholder="Holiday Title" 
                   required 
-                  value={holidayTitle} 
+                  value={holidayTitle}
                   onChange={e => setHolidayTitle(e.target.value)}
-                  className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold"
+                  className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold"
                 />
-                <button type="submit" className="py-2 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-slate-800">
-                  + Add Holiday
-                </button>
+                <button type="submit" className="px-4 py-2 bg-slate-900 text-white font-bold text-xs rounded-xl">Add</button>
               </form>
 
-              <div className="space-y-2 max-h-80 overflow-y-auto">
+              <div className="divide-y divide-slate-100">
                 {companyHolidays.map(item => (
-                  <div key={item.id} className="flex justify-between items-center p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                  <div key={item.id} className="py-3 flex justify-between items-center">
                     <div>
-                      <p className="text-xs font-bold text-slate-800">{item.title}</p>
-                      <span className="text-xs text-slate-400 font-mono">{item.date}</span>
+                      <p className="font-bold text-xs text-slate-900">{item.title}</p>
+                      <p className="text-xs text-slate-400 font-mono">{item.date}</p>
                     </div>
-                    <button 
-                      onClick={() => handleDeleteHoliday(item.id)}
-                      className="text-xs text-red-500 hover:underline font-bold"
-                    >
-                      Delete
-                    </button>
+                    <button onClick={() => handleDeleteHoliday(item.id)} className="text-xs text-red-500 hover:underline">Remove</button>
                   </div>
                 ))}
               </div>
@@ -807,36 +819,24 @@ export default function App() {
 
         {/* SETTINGS TAB */}
         {activeTab === 'settings' && (
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 max-w-xl space-y-6">
-            <h3 className="text-lg font-bold text-slate-800 border-b border-slate-100 pb-3">System Settings</h3>
-            
+          <div className="max-w-xl bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-4">
+            <h3 className="text-lg font-bold text-slate-800 border-b border-slate-100 pb-3">Portal Settings & Email Dispatcher</h3>
             <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase mb-2">HR Email Address</label>
+              <label className="block text-xs font-bold text-slate-700 uppercase mb-1">HR Receiver Email</label>
               <input 
                 type="email" 
-                value={hrEmailAddress} 
+                value={hrEmailAddress}
                 onChange={e => setHrEmailAddress(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-600"
+                className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-semibold"
               />
             </div>
-
-            <div className="pt-4 border-t border-slate-100">
-              <button 
-                onClick={() => {
-                  if (window.confirm('Rollover unused CL and reset SL?')) {
-                    setClCarryForward(remainingCL);
-                    alert(`Rollover complete! ${remainingCL} CL carried forward.`);
-                  }
-                }}
-                className="w-full py-3 bg-amber-50 border border-amber-200 text-amber-800 font-bold rounded-xl text-xs hover:bg-amber-100 transition"
-              >
-                🔄 Trigger Year-End Rollover
-              </button>
-            </div>
+            <p className="text-xs text-slate-500 leading-relaxed">
+              All leave notification emails from the portal will automatically dispatch to this address.
+            </p>
           </div>
         )}
-      </main>
 
+      </main>
     </div>
   );
 }
