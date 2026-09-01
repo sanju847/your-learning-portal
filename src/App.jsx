@@ -25,6 +25,8 @@ export default function App() {
   const [hrEmailAddress, setHrEmailAddress] = useState(() => localStorage.getItem('ylp_hr_email') || 'sanju@yourlearnings.com');
   
   const [isSendingMail, setIsSendingMail] = useState(false);
+  const [isFetchingData, setIsFetchingData] = useState(false); // Refresh Loading Indicator State
+  const [lastSyncedTime, setLastSyncedTime] = useState('');
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [currentMailData, setCurrentMailData] = useState(null);
   
@@ -81,8 +83,10 @@ export default function App() {
     }
   };
 
-  // Fetch Directly from Supabase - Keeping Mail Logs in Sync with Database
-  const fetchLeaves = async () => {
+  // Dedicated Database Refresh Function
+  const fetchLeaves = async (showLoading = false) => {
+    if (showLoading) setIsFetchingData(true);
+    
     const { data, error } = await supabase
       .from('leaves')
       .select('*')
@@ -90,9 +94,16 @@ export default function App() {
     
     if (!error && data) {
       setAppliedLeaves(data);
+      const now = new Date();
+      setLastSyncedTime(now.toLocaleTimeString());
+    }
+
+    if (showLoading) {
+      setTimeout(() => setIsFetchingData(false), 400); // Subtle UI feedback
     }
   };
 
+  // URL Mail Action Listener
   useEffect(() => {
     const handleUrlAction = async () => {
       const urlParams = new URLSearchParams(window.location.search);
@@ -137,19 +148,29 @@ export default function App() {
     handleUrlAction();
   }, []);
 
+  // Initial Fetch & Auto Refresh Timer (Every 15 Seconds)
   useEffect(() => {
-    fetchLeaves();
+    if (isLoggedIn) {
+      fetchLeaves();
 
-    const channel = supabase
-      .channel('schema-db-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'leaves' }, () => {
-        fetchLeaves();
-      })
-      .subscribe();
+      // Auto Polling Every 15 seconds
+      const pollInterval = setInterval(() => {
+        fetchLeaves(false);
+      }, 15000);
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+      // Realtime Database WebSockets
+      const channel = supabase
+        .channel('schema-db-changes')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'leaves' }, () => {
+          fetchLeaves(false);
+        })
+        .subscribe();
+
+      return () => {
+        clearInterval(pollInterval);
+        supabase.removeChannel(channel);
+      };
+    }
   }, [isLoggedIn]);
 
   const bgImages = [
@@ -314,13 +335,13 @@ export default function App() {
 
     triggerPartyPopper();
     setShowSuccessModal(true);
-    fetchLeaves();
+    fetchLeaves(true);
   };
 
   const handleDeleteLeave = async (id) => {
     if (window.confirm('Remove this leave entry and restore balance?')) {
       await supabase.from('leaves').delete().eq('id', id);
-      fetchLeaves();
+      fetchLeaves(true);
     }
   };
 
@@ -355,7 +376,7 @@ export default function App() {
     setCompanyHolidays(companyHolidays.filter(h => h.id !== id));
   };
 
-  // ---------------- HR ACTION THANK YOU RESPONSE SCREEN ----------------
+  // ---------------- HR THANK YOU SCREEN ----------------
   if (hrActionState) {
     return (
       <div className="w-screen h-screen flex items-center justify-center bg-slate-950 p-6 font-sans">
@@ -411,7 +432,7 @@ export default function App() {
     );
   }
 
-  // ---------------- LOGIN PAGE ----------------
+  // ---------------- LOGIN SCREEN ----------------
   if (!isLoggedIn) {
     return (
       <div className="w-screen h-screen flex items-center justify-center bg-slate-950 p-4 relative overflow-hidden">
@@ -493,7 +514,7 @@ export default function App() {
     );
   }
 
-  // ---------------- PORTAL MAIN PAGE ----------------
+  // ---------------- PORTAL DASHBOARD ----------------
   return (
     <div className="w-screen h-screen flex bg-slate-100 overflow-hidden relative">
       
@@ -573,15 +594,18 @@ export default function App() {
         </div>
       </aside>
 
-      {/* Main Content */}
+      {/* Main Content Area */}
       <main className="flex-1 h-full p-8 overflow-y-auto">
         <header className="flex justify-between items-center mb-8 pb-5 border-b border-slate-200">
           <div>
             <h1 className="text-3xl font-extrabold text-slate-900">Welcome, {currentUser.name}</h1>
             <p className="text-sm text-slate-500 font-semibold mt-0.5">{currentUser.employeeId} | Joined: {currentUser.joiningDate}</p>
           </div>
-          <div className="px-4 py-2 bg-emerald-100 text-emerald-800 rounded-full text-xs font-bold border border-emerald-200">
-            Active Member Status
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-slate-400 font-semibold hidden sm:inline">Last Sync: {lastSyncedTime || 'Just now'}</span>
+            <div className="px-4 py-2 bg-emerald-100 text-emerald-800 rounded-full text-xs font-bold border border-emerald-200">
+              Active Member Status
+            </div>
           </div>
         </header>
 
@@ -622,9 +646,22 @@ export default function App() {
               </div>
             </div>
 
-            {/* Leave Table */}
+            {/* Leave Records Table with Manual Refresh Button */}
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-              <h3 className="text-lg font-bold text-slate-800 mb-4">Leave Application Records</h3>
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-bold text-slate-800">Leave Application Records</h3>
+                
+                {/* DYNAMIC REFRESH BUTTON */}
+                <button
+                  onClick={() => fetchLeaves(true)}
+                  disabled={isFetchingData}
+                  className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold flex items-center gap-2 border border-slate-300 transition shadow-sm active:scale-95"
+                >
+                  <span className={`text-sm ${isFetchingData ? 'animate-spin' : ''}`}>🔄</span>
+                  {isFetchingData ? 'Updating Status...' : 'Refresh Data'}
+                </button>
+              </div>
+
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse text-sm">
                   <thead>
@@ -674,7 +711,7 @@ export default function App() {
               </div>
             </div>
 
-            {/* Dynamically Synced HR Mail Logs */}
+            {/* HR Email Dispatcher Logs */}
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-bold text-slate-800">📬 HR Email Dispatcher Logs</h3>
