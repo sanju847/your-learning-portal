@@ -30,25 +30,6 @@ export default function App() {
   const [loginError, setLoginError] = useState('');
   const [activeTab, setActiveTab] = useState('dashboard');
 
-  // 3D Tilt Card state for Login
-  const [cardRotation, setCardRotation] = useState({ x: 0, y: 0 });
-  const cardRef = useRef(null);
-
-  const handleMouseMove = (e) => {
-    if (!cardRef.current) return;
-    const rect = cardRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left - rect.width / 2;
-    const y = e.clientY - rect.top - rect.height / 2;
-    setCardRotation({
-      x: -(y / 20),
-      y: x / 20
-    });
-  };
-
-  const handleMouseLeave = () => {
-    setCardRotation({ x: 0, y: 0 });
-  };
-
   const [clQuota, setClQuota] = useState(() => Number(localStorage.getItem('ylp_cl_quota')) || 12);
   
   const [carryForwardHistory, setCarryForwardHistory] = useState(() => {
@@ -504,109 +485,103 @@ export default function App() {
     );
   }
 
+  // --- LOGIN VIEW: Clean Static Card + Magnific Style 3D Studio Showcase Background ---
   if (!isLoggedIn) {
     return (
-      <div 
-        className="min-h-screen w-full flex items-center justify-center bg-[#070913] p-4 relative overflow-hidden perspective-1000"
-        onMouseMove={handleMouseMove}
-        onMouseLeave={handleMouseLeave}
-      >
-        {/* Animated 3D Glowing Orbs Background */}
-        <div className="absolute top-10 left-10 w-96 h-96 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-full filter blur-[140px] opacity-40 animate-pulse"></div>
-        <div className="absolute bottom-10 right-10 w-96 h-96 bg-gradient-to-r from-cyan-500 to-blue-600 rounded-full filter blur-[140px] opacity-40 animate-pulse"></div>
+      <div className="min-h-screen w-full flex items-center justify-center bg-[#05060f] p-4 relative overflow-hidden select-none">
         
-        {/* Futuristic Cyber-Grid Lines */}
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#1f293d15_1px,transparent_1px),linear-gradient(to_bottom,#1f293d15_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_50%,#000_70%,transparent_100%)]"></div>
+        {/* MAGNIFIC-STYLE BG SHOWCASE LAYER */}
+        {/* Soft Ambient Studio Lighting Spotlight */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[600px] bg-gradient-to-tr from-indigo-900/40 via-purple-900/30 to-blue-900/20 rounded-full blur-[160px] pointer-events-none"></div>
 
-        {/* 3D Floating Element Props */}
-        <div className="hidden lg:block absolute left-16 top-1/3 w-16 h-16 bg-gradient-to-br from-indigo-500 to-purple-700 rounded-2xl rotate-12 blur-[1px] shadow-[0_20px_40px_rgba(79,70,229,0.5)] animate-bounce duration-[3000ms]"></div>
-        <div className="hidden lg:block absolute right-20 bottom-1/4 w-20 h-20 bg-gradient-to-br from-cyan-400 to-blue-600 rounded-full -rotate-45 blur-[1px] shadow-[0_20px_40px_rgba(6,182,212,0.5)] animate-bounce duration-[4000ms]"></div>
-
-        {/* 3D Interactive Main Login Card Container */}
+        {/* 3D Floor Perspective Grid (Showroom Floor) */}
         <div 
-          ref={cardRef}
+          className="absolute inset-0 opacity-25 pointer-events-none"
           style={{
-            transform: `perspective(1000px) rotateX(${cardRotation.x}deg) rotateY(${cardRotation.y}deg)`,
-            transition: 'transform 0.1s cubic-bezier(0.03, 0.98, 0.52, 0.99)'
+            backgroundImage: `radial-gradient(circle at 50% 50%, rgba(99, 102, 241, 0.15) 1px, transparent 1px)`,
+            backgroundSize: '40px 40px',
+            transform: 'perspective(500px) rotateX(60deg) translateY(100px)',
+            transformOrigin: 'bottom center'
           }}
-          className="w-full max-w-4xl bg-slate-900/60 backdrop-blur-2xl rounded-3xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.9)] overflow-hidden flex flex-col md:flex-row border border-white/10 relative z-10 my-auto group"
-        >
-          {/* Neon Border Glow */}
-          <div className="absolute -inset-[1px] bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 rounded-3xl opacity-30 group-hover:opacity-70 transition duration-500 blur-sm pointer-events-none"></div>
+        ></div>
 
-          {/* Left Side Visual - Smooth Ken Burns + 3D Glass Layer */}
+        {/* Soft Glowing Ambient Orbs */}
+        <div className="absolute left-10 top-1/4 w-32 h-32 bg-purple-600/30 rounded-full blur-2xl"></div>
+        <div className="absolute right-12 bottom-1/4 w-40 h-40 bg-cyan-500/30 rounded-full blur-2xl"></div>
+
+        {/* STATIC ACCESSIBLE LOGIN CARD CONTAINER */}
+        <div className="w-full max-w-4xl bg-[#0e1322]/90 backdrop-blur-xl rounded-3xl shadow-[0_30px_90px_rgba(0,0,0,0.8)] border border-white/10 overflow-hidden flex flex-col md:flex-row relative z-10">
+          
+          {/* Left Side: Ken Burns Image Slider */}
           <div className="w-full md:w-1/2 relative flex flex-col justify-between p-6 md:p-10 text-white overflow-hidden min-h-[300px] md:min-h-[460px]">
             {bgImages.map((img, i) => (
               <div
                 key={i}
-                className={`absolute inset-0 bg-cover bg-center transition-all duration-1000 transform ${
-                  i === bgIndex 
-                    ? 'opacity-80 scale-125 ease-out duration-[6000ms]' 
-                    : 'opacity-0 scale-100'
+                className={`absolute inset-0 bg-cover bg-center transition-opacity duration-1000 ${
+                  i === bgIndex ? 'opacity-70 scale-105 transition-transform duration-[4000ms]' : 'opacity-0 scale-100'
                 }`}
                 style={{ backgroundImage: `url(${img})` }}
               />
             ))}
             
-            <div className="absolute inset-0 bg-gradient-to-t from-[#090d16] via-[#090d16]/50 to-transparent z-[1]" />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#090d16] via-[#090d16]/40 to-transparent z-[1]" />
 
             <div className="relative z-10">
-              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-white/10 backdrop-blur-md rounded-full text-xs font-semibold mb-4 border border-white/20 shadow-2xl">
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_10px_#34d399] animate-ping"></span>
-                Corporate Workspace 3D
+              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-white/10 backdrop-blur-md rounded-full text-xs font-semibold mb-4 border border-white/15">
+                <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+                Corporate Workspace
               </div>
-              <h2 className="text-3xl md:text-4xl font-black tracking-tight drop-shadow-xl bg-gradient-to-r from-white via-slate-100 to-indigo-200 bg-clip-text text-transparent">
+              <h2 className="text-3xl md:text-4xl font-black tracking-tight text-white drop-shadow">
                 Your Learning Portal
               </h2>
             </div>
 
-            <div className="relative z-10 text-xs font-bold tracking-widest text-indigo-300 uppercase mt-4 md:mt-0 drop-shadow flex items-center gap-2">
-              <span className="w-2 h-2 bg-indigo-500 rounded-full animate-ping"></span>
-              Enterprise Attendance System
+            <div className="relative z-10 text-[11px] font-bold tracking-widest text-indigo-300 uppercase mt-4 md:mt-0">
+              ENTERPRISE ATTENDANCE SYSTEM
             </div>
           </div>
 
-          {/* Right Side Glass Form */}
-          <div className="w-full md:w-1/2 bg-[#0d1322]/90 backdrop-blur-2xl p-6 md:p-10 flex flex-col justify-center border-t md:border-t-0 md:border-l border-white/10 relative z-20">
+          {/* Right Side: Straightforward Functional Sign-In Form */}
+          <div className="w-full md:w-1/2 bg-[#090d16] p-6 md:p-10 flex flex-col justify-center border-t md:border-t-0 md:border-l border-white/10">
             <div className="mb-6">
               <h3 className="text-2xl md:text-3xl font-black text-white tracking-tight">Sign In</h3>
-              <p className="text-slate-400 text-xs font-medium mt-1">Enter credentials to access portal</p>
+              <p className="text-slate-400 text-xs font-semibold mt-1">Enter credentials for Your Learning Portal</p>
             </div>
 
             {loginError && (
-              <div className="mb-4 p-3 bg-rose-500/10 border border-rose-500/30 text-rose-400 rounded-xl text-xs font-semibold shadow-inner">
+              <div className="mb-4 p-3 bg-rose-500/10 border border-rose-500/30 text-rose-400 rounded-xl text-xs font-semibold">
                 ⚠️ {loginError}
               </div>
             )}
 
             <form onSubmit={handleLogin} className="space-y-4">
               <div>
-                <label className="block text-[11px] font-bold text-indigo-300 uppercase tracking-wider mb-1.5">USERNAME</label>
+                <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">USERNAME</label>
                 <input 
                   type="text" 
                   required
                   placeholder="Sanju"
                   value={usernameInput} 
                   onChange={e => setUsernameInput(e.target.value)}
-                  className="w-full px-4 py-3.5 rounded-xl bg-slate-900/80 border border-white/10 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 text-white text-sm font-semibold transition shadow-inner placeholder:text-slate-600"
+                  className="w-full px-4 py-3.5 rounded-xl bg-slate-900 border border-slate-800 focus:border-indigo-500 focus:outline-none text-white text-sm font-semibold transition"
                 />
               </div>
 
               <div>
-                <label className="block text-[11px] font-bold text-indigo-300 uppercase tracking-wider mb-1.5">PASSWORD</label>
+                <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">PASSWORD</label>
                 <input 
                   type="password" 
                   required
                   placeholder="••••••••"
                   value={passwordInput} 
                   onChange={e => setPasswordInput(e.target.value)}
-                  className="w-full px-4 py-3.5 rounded-xl bg-slate-900/80 border border-white/10 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 text-white text-sm font-semibold transition shadow-inner placeholder:text-slate-600"
+                  className="w-full px-4 py-3.5 rounded-xl bg-slate-900 border border-slate-800 focus:border-indigo-500 focus:outline-none text-white text-sm font-semibold transition"
                 />
               </div>
 
               <button 
                 type="submit" 
-                className="w-full py-4 bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-extrabold rounded-xl shadow-[0_10px_25px_-5px_rgba(79,70,229,0.5)] transition-all duration-300 border border-white/20 text-sm mt-3 transform active:scale-[0.98] hover:-translate-y-0.5"
+                className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl shadow-lg transition text-sm mt-2"
               >
                 Access Account
               </button>
