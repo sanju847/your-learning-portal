@@ -1,10 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
 const SUPABASE_URL = 'https://mhiqoknxkwmbisjurhvs.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1oaXFva254a3dtYmlzanVyaHZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgyMjY2OTksImV4cCI6MjEwMzgwMjY5OX0.OlJeKPhziAYxTcwKDdJJhrobQIjW_wbFPu1UOjHWZps';
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// 🔊 Sound URLs for Status Notification Alerts
+const APPROVE_SOUND = 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3';
+const REJECT_SOUND = 'https://assets.mixkit.co/active_storage/sfx/2873/2873-preview.mp3';
 
 export default function App() {
   const [hrActionState, setHrActionState] = useState(null);
@@ -32,6 +36,9 @@ export default function App() {
 
   const [appliedLeaves, setAppliedLeaves] = useState([]);
   const [reminderSentMap, setReminderSentMap] = useState({});
+
+  // Prev Leave status tracker for sound playback
+  const prevLeavesMapRef = useRef({});
 
   const [companyHolidays, setCompanyHolidays] = useState(() => {
     const saved = localStorage.getItem('ylp_holidays');
@@ -83,6 +90,7 @@ export default function App() {
     }
   };
 
+  // 🔔 Fetch Leaves with Sound Detection Logic
   const fetchLeaves = async (showLoading = false) => {
     if (showLoading) setIsFetchingData(true);
     
@@ -92,6 +100,25 @@ export default function App() {
       .order('created_at', { ascending: false });
     
     if (!error && data) {
+      // Sound alert check on status updates
+      data.forEach(item => {
+        const prevStatus = prevLeavesMapRef.current[item.id];
+        if (prevStatus && prevStatus !== item.status) {
+          if (item.status === 'Approved') {
+            new Audio(APPROVE_SOUND).play().catch(e => console.log("Audio blocked:", e));
+          } else if (item.status === 'Rejected') {
+            new Audio(REJECT_SOUND).play().catch(e => console.log("Audio blocked:", e));
+          }
+        }
+      });
+
+      // Update tracked status map
+      const newMap = {};
+      data.forEach(item => {
+        newMap[item.id] = item.status;
+      });
+      prevLeavesMapRef.current = newMap;
+
       setAppliedLeaves(data);
       const now = new Date();
       setLastSyncedTime(now.toLocaleTimeString());
@@ -156,7 +183,7 @@ export default function App() {
 
       const pollInterval = setInterval(() => {
         fetchLeaves(false);
-      }, 15000);
+      }, 10000);
 
       const channel = supabase
         .channel('schema-db-changes')
@@ -269,8 +296,14 @@ export default function App() {
     setActiveTab('dashboard');
   };
 
+  // 🔴 Mandatory Reason Validation Check
   const handleApplyLeave = async (e) => {
     e.preventDefault();
+
+    if (!leaveReason || leaveReason.trim() === '') {
+      alert("Kripya leave ka reason darj karein! / Reason is required.");
+      return;
+    }
 
     let count = 1;
     let dateStr = '';
@@ -303,7 +336,7 @@ export default function App() {
           category: leaveCategory,
           date_str: dateStr,
           days_count: count,
-          reason: leaveReason || 'Personal Request',
+          reason: leaveReason.trim(),
           status: 'Pending HR Approval'
         }
       ])
@@ -319,9 +352,9 @@ export default function App() {
       category: leaveCategory,
       daysCount: count,
       dateStr,
-      reason: leaveReason || 'Personal Request',
+      reason: leaveReason.trim(),
       subject: `[LEAVE APPLICATION] - ${currentUser.name} (${leaveCategory} - ${count} Day(s))`,
-      body: `Dear HR Team,\n\nI have submitted a leave request on the portal with details below:\n\n• Employee Name: ${currentUser.name} (${currentUser.employeeId})\n• Leave Type: ${leaveCategory}\n• Duration: ${dateStr} (${count} Day(s))\n• Reason: ${leaveReason || 'Personal Request'}\n\nKindly review and approve this application.\n\nBest Regards,\n${currentUser.name}\n${currentUser.role}`,
+      body: `Dear HR Team,\n\nI have submitted a leave request on the portal with details below:\n\n• Employee Name: ${currentUser.name} (${currentUser.employeeId})\n• Leave Type: ${leaveCategory}\n• Duration: ${dateStr} (${count} Day(s))\n• Reason: ${leaveReason.trim()}\n\nKindly review and approve this application.\n\nBest Regards,\n${currentUser.name}\n${currentUser.role}`,
       sentDate: new Date().toLocaleDateString()
     };
 
@@ -511,7 +544,7 @@ export default function App() {
   }
 
   return (
-    <div className="w-screen h-screen flex bg-slate-100 overflow-hidden relative">
+    <div className="w-screen h-screen flex bg-slate-100 overflow-hidden relative font-sans">
       {showSuccessModal && currentMailData && (
         <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl p-6 max-w-lg w-full shadow-2xl border border-slate-100">
@@ -699,9 +732,9 @@ export default function App() {
                             )}
                             <button 
                               onClick={() => handleDeleteLeave(item.id)}
-                              className="px-3 py-1 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white rounded-lg text-xs font-bold transition border border-red-200"
+                              className="px-3 py-1 text-xs font-bold rounded-lg border bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white border-rose-200 transition"
                             >
-                              🗑️ Remove
+                              🗑️ Delete
                             </button>
                           </td>
                         </tr>
@@ -716,202 +749,202 @@ export default function App() {
 
         {/* CALENDAR & APPLY LEAVE TAB */}
         {activeTab === 'calendar' && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-              <h3 className="text-lg font-bold text-slate-800 mb-6">Request Leave</h3>
-              <form onSubmit={handleApplyLeave} className="space-y-4">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+              <h3 className="text-xl font-extrabold text-slate-900 mb-6">Apply Leave Request</h3>
+
+              <form onSubmit={handleApplyLeave} className="space-y-5">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Leave Type</label>
-                  <select
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-2">Leave Category</label>
+                  <select 
                     value={leaveCategory}
                     onChange={e => setLeaveCategory(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-600"
+                    className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 font-semibold text-sm focus:outline-none focus:ring-2 focus:ring-indigo-600"
                   >
                     <option value="CL">Casual Leave (CL)</option>
                     <option value="SL">Sick Leave (SL)</option>
                     <option value="Sabbatical" disabled={!isSabbaticalEligible}>
-                      Sabbatical Leave {!isSabbaticalEligible ? '(Locked - 3 Yrs Required)' : ''}
+                      Sabbatical Leave {!isSabbaticalEligible ? '(Locked - 3 Yrs Tenure Needed)' : ''}
                     </option>
                   </select>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Duration Mode</label>
-                  <div className="grid grid-cols-2 gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setDateMode('single')}
-                      className={`py-2.5 rounded-xl text-xs font-bold border ${dateMode === 'single' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-slate-50 text-slate-600 border-slate-200'}`}
-                    >
-                      Single Day
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setDateMode('range')}
-                      className={`py-2.5 rounded-xl text-xs font-bold border ${dateMode === 'range' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-slate-50 text-slate-600 border-slate-200'}`}
-                    >
-                      Date Range
-                    </button>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-2">Duration Selection</label>
+                  <div className="flex gap-4">
+                    <label className="flex items-center gap-2 cursor-pointer text-sm font-semibold text-slate-700">
+                      <input 
+                        type="radio" 
+                        name="dateMode" 
+                        value="single" 
+                        checked={dateMode === 'single'} 
+                        onChange={() => setDateMode('single')}
+                      /> Single Day
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer text-sm font-semibold text-slate-700">
+                      <input 
+                        type="radio" 
+                        name="dateMode" 
+                        value="range" 
+                        checked={dateMode === 'range'} 
+                        onChange={() => setDateMode('range')}
+                      /> Date Range (Multiple Days)
+                    </label>
                   </div>
                 </div>
 
                 {dateMode === 'single' ? (
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Select Date</label>
-                    <input
-                      type="date"
+                    <label className="block text-xs font-bold text-slate-700 uppercase mb-2">Select Date</label>
+                    <input 
+                      type="date" 
                       value={singleDate}
                       onChange={e => setSingleDate(e.target.value)}
-                      className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-600"
+                      className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 font-semibold text-sm focus:outline-none focus:ring-2 focus:ring-indigo-600"
                     />
                   </div>
                 ) : (
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Start Date</label>
-                      <input
-                        type="date"
+                      <label className="block text-xs font-bold text-slate-700 uppercase mb-2">Start Date</label>
+                      <input 
+                        type="date" 
                         value={startDate}
                         onChange={e => setStartDate(e.target.value)}
-                        className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-600"
+                        className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 font-semibold text-sm focus:outline-none focus:ring-2 focus:ring-indigo-600"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">End Date</label>
-                      <input
-                        type="date"
+                      <label className="block text-xs font-bold text-slate-700 uppercase mb-2">End Date</label>
+                      <input 
+                        type="date" 
                         value={endDate}
                         onChange={e => setEndDate(e.target.value)}
-                        className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-600"
+                        className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 font-semibold text-sm focus:outline-none focus:ring-2 focus:ring-indigo-600"
                       />
                     </div>
                   </div>
                 )}
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Reason</label>
-                  <textarea
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-2">Reason for Leave <span className="text-rose-600">*</span></label>
+                  <textarea 
                     rows="3"
-                    placeholder="Provide a brief reason for your leave request..."
+                    required
+                    placeholder="Enter explicit reason for leave request..."
                     value={leaveReason}
                     onChange={e => setLeaveReason(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-600 resize-none"
-                  ></textarea>
+                    className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 font-semibold text-sm focus:outline-none focus:ring-2 focus:ring-indigo-600"
+                  />
                 </div>
 
-                <button
+                <button 
                   type="submit"
                   disabled={isSendingMail}
-                  className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl shadow-lg border border-white/20 text-sm transition"
+                  className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold rounded-xl shadow-lg transition border border-white/20 text-sm"
                 >
-                  {isSendingMail ? 'Sending Notification...' : 'Submit Application'}
+                  {isSendingMail ? 'Sending Mail to HR...' : 'Submit Leave Request & Send Email'}
                 </button>
               </form>
             </div>
 
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-              <h3 className="text-lg font-bold text-slate-800 mb-6">Company Holidays Calendar</h3>
-              <ul className="divide-y divide-slate-100 mb-6 max-h-72 overflow-y-auto">
-                {companyHolidays.map(holiday => (
-                  <li key={holiday.id} className="py-3 flex justify-between items-center">
-                    <div>
-                      <p className="font-bold text-slate-800 text-sm">{holiday.title}</p>
-                      <span className="text-xs text-slate-400 font-semibold">{holiday.date}</span>
-                    </div>
-                    <button
-                      onClick={() => handleDeleteHoliday(holiday.id)}
-                      className="text-xs font-bold text-rose-500 hover:text-rose-700"
-                    >
-                      Delete
-                    </button>
-                  </li>
-                ))}
-              </ul>
+            {/* Holidays List */}
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-6">
+              <h3 className="text-xl font-extrabold text-slate-900">Company Holidays</h3>
 
-              <form onSubmit={handleAddHoliday} className="border-t border-slate-100 pt-4 space-y-3">
-                <p className="text-xs font-bold text-slate-700 uppercase tracking-wider">Add Custom Holiday</p>
-                <div className="grid grid-cols-2 gap-3">
-                  <input
-                    type="date"
-                    value={holidayDate}
-                    onChange={e => setHolidayDate(e.target.value)}
-                    className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Holiday Title"
-                    value={holidayTitle}
-                    onChange={e => setHolidayTitle(e.target.value)}
-                    className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none"
-                  />
-                </div>
-                <button
-                  type="submit"
-                  className="w-full py-2.5 bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs rounded-xl shadow transition"
-                >
-                  Add Holiday
+              <form onSubmit={handleAddHoliday} className="space-y-3 pb-4 border-b border-slate-200">
+                <input 
+                  type="date" 
+                  value={holidayDate}
+                  onChange={e => setHolidayDate(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs font-semibold"
+                />
+                <input 
+                  type="text" 
+                  placeholder="Holiday Title (e.g. Diwali)"
+                  value={holidayTitle}
+                  onChange={e => setHolidayTitle(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs font-semibold"
+                />
+                <button type="submit" className="w-full py-2 bg-slate-900 text-white font-bold rounded-lg text-xs">
+                  + Add Holiday
                 </button>
               </form>
+
+              <div className="space-y-2 max-h-80 overflow-y-auto">
+                {companyHolidays.map(h => (
+                  <div key={h.id} className="flex justify-between items-center p-3 bg-slate-50 rounded-xl border border-slate-100">
+                    <div>
+                      <p className="font-bold text-xs text-slate-900">{h.title}</p>
+                      <p className="text-[10px] text-slate-400 font-semibold">{h.date}</p>
+                    </div>
+                    <button 
+                      onClick={() => handleDeleteHoliday(h.id)}
+                      className="text-xs text-rose-500 font-bold hover:underline"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         )}
 
         {/* SETTINGS TAB */}
         {activeTab === 'settings' && (
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 max-w-2xl">
-            <h3 className="text-lg font-bold text-slate-800 mb-6">Annual Quotas & System Config</h3>
-            
-            <div className="space-y-6">
+          <div className="max-w-2xl bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-6">
+            <h3 className="text-xl font-extrabold text-slate-900">Portal Configuration & HR Setup</h3>
+
+            <div className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">HR Email Address</label>
-                <input
-                  type="email"
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">HR Email Address (Notifications Target)</label>
+                <input 
+                  type="email" 
                   value={hrEmailAddress}
                   onChange={e => setHrEmailAddress(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-600"
+                  className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 font-semibold text-sm focus:outline-none focus:ring-2 focus:ring-indigo-600"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">CL Quota</label>
-                  <input
-                    type="number"
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Annual CL Quota</label>
+                  <input 
+                    type="number" 
                     value={clQuota}
                     onChange={e => setClQuota(Number(e.target.value))}
-                    className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-600"
+                    className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 font-semibold text-sm"
                   />
                 </div>
-
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">CL Carry Forward</label>
-                  <input
-                    type="number"
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">CL Carry Forward</label>
+                  <input 
+                    type="number" 
                     value={clCarryForward}
                     onChange={e => setClCarryForward(Number(e.target.value))}
-                    className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-600"
+                    className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 font-semibold text-sm"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">SL Quota</label>
-                  <input
-                    type="number"
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Annual SL Quota</label>
+                  <input 
+                    type="number" 
                     value={slQuota}
                     onChange={e => setSlQuota(Number(e.target.value))}
-                    className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-600"
+                    className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 font-semibold text-sm"
                   />
                 </div>
-
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Sabbatical Quota</label>
-                  <input
-                    type="number"
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Sabbatical Quota (3+ Yrs)</label>
+                  <input 
+                    type="number" 
                     value={sabbaticalQuota}
                     onChange={e => setSabbaticalQuota(Number(e.target.value))}
-                    className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-600"
+                    className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 font-semibold text-sm"
                   />
                 </div>
               </div>
