@@ -30,6 +30,9 @@ export default function App() {
   const [loginError, setLoginError] = useState('');
   const [activeTab, setActiveTab] = useState('dashboard');
 
+  // Custom Attendance Toast Modal
+  const [toastNotification, setToastNotification] = useState({ show: false, title: '', message: '' });
+
   // Quota & Carry Forward States
   const [clQuota, setClQuota] = useState(12);
   const [slQuota, setSlQuota] = useState(6);
@@ -59,6 +62,11 @@ export default function App() {
   const [extraWorkDate, setExtraWorkDate] = useState('');
   const [extraWorkReason, setExtraWorkReason] = useState('');
 
+  // Calendar State
+  const [selectedCalendarDate, setSelectedCalendarDate] = useState(new Date().toISOString().split('T')[0]);
+  const [calendarViewMonth, setCalendarViewMonth] = useState(new Date().getMonth());
+  const [calendarViewYear, setCalendarViewYear] = useState(new Date().getFullYear());
+
   const prevLeavesMapRef = useRef({});
 
   const [companyHolidays, setCompanyHolidays] = useState(() => {
@@ -84,6 +92,13 @@ export default function App() {
   const VALID_USER = 'Sanju';
   const VALID_PASS = 'Admin@321';
   const JOINING_DATE = '2023-01-01';
+
+  const triggerToast = (title, message) => {
+    setToastNotification({ show: true, title, message });
+    setTimeout(() => {
+      setToastNotification({ show: false, title: '', message: '' });
+    }, 4000);
+  };
 
   const checkThreeYearsCompleted = (joinDateStr) => {
     const joinDate = new Date(joinDateStr);
@@ -164,7 +179,6 @@ export default function App() {
     }
   };
 
-  // FETCH ATTENDANCE + AUTOMATIC ABSENT ENGINE
   const fetchAttendance = async () => {
     const { data, error } = await supabase.from('attendance').select('*').order('date', { ascending: false });
     if (!error && data) {
@@ -173,27 +187,24 @@ export default function App() {
     }
   };
 
-  // AUTO-ABSENT ENGINE: Check past dates & mark Absent if not marked
   const checkAndAutoMarkAbsent = async (currentRecords) => {
     const today = new Date();
     const recordsMap = new Set(currentRecords.map(r => r.date));
     const newAbsentEntries = [];
 
-    // Check last 7 days for any un-marked working day
     for (let i = 1; i <= 7; i++) {
       const pastDate = new Date();
       pastDate.setDate(today.getDate() - i);
       const dateStr = pastDate.toISOString().split('T')[0];
       const dayNum = pastDate.getDay();
 
-      // Skip Weekends (Sunday=0, Saturday=6)
       if (dayNum !== 0 && dayNum !== 6) {
         if (!recordsMap.has(dateStr)) {
           newAbsentEntries.push({
             date: dateStr,
             status: 'Absent',
             type: 'Regular Workday',
-            note: 'Auto-marked Absent (Attendance not submitted)'
+            note: 'Auto-marked Absent (Attendance missing)'
           });
         }
       }
@@ -204,7 +215,6 @@ export default function App() {
     }
   };
 
-  // EMAIL APPROVAL / REJECTION URL HANDLER
   useEffect(() => {
     const handleUrlAction = async () => {
       const urlParams = new URLSearchParams(window.location.search);
@@ -313,30 +323,45 @@ export default function App() {
   const todayStr = new Date().toISOString().split('T')[0];
   const todayRecord = attendanceRecords.find(r => r.date === todayStr);
 
-  // MARK ATTENDANCE ACTION WITH SUPABASE RE-FETCH
-  const markTodayAttendance = async () => {
-    const today = new Date();
-    const dayNum = today.getDay();
+  // MARK ATTENDANCE BY CALENDAR / ANY SPECIFIC DATE
+  const handleMarkDateAttendance = async (targetDate) => {
+    const d = new Date(targetDate);
+    const dayNum = d.getDay();
     const isWeekend = dayNum === 0 || dayNum === 6;
 
     const payload = {
-      date: todayStr,
+      date: targetDate,
       status: 'Present',
       type: isWeekend ? 'Extra Weekend Work' : 'Regular Workday',
-      note: isWeekend ? 'Weekend Duty Log' : 'Standard Present'
+      note: targetDate === todayStr ? 'Standard Present' : 'Back-date Present Entry'
     };
 
     const { error } = await supabase.from('attendance').upsert([payload], { onConflict: 'date' });
     
     if (!error) {
       await fetchAttendance();
-      alert("✓ Today's Attendance Marked Successfully!");
+      triggerToast(
+        "Attendance Marked!", 
+        `Attendance recorded as Present for ${targetDate}`
+      );
     } else {
       alert("⚠️ Error updating Database: " + error.message);
     }
   };
 
-  // LOG EXTRA WORK DAY ACTION WITH SUPABASE RE-FETCH
+  // DELETE WRONG ATTENDANCE ENTRY
+  const handleDeleteAttendanceRecord = async (dateStr) => {
+    if (window.confirm(`Delete attendance record for ${dateStr}?`)) {
+      const { error } = await supabase.from('attendance').delete().eq('date', dateStr);
+      if (!error) {
+        await fetchAttendance();
+        triggerToast("Record Removed", `Attendance entry for ${dateStr} has been deleted.`);
+      } else {
+        alert("⚠️ Failed to delete entry: " + error.message);
+      }
+    }
+  };
+
   const handleAddExtraWork = async (e) => {
     e.preventDefault();
     if (!extraWorkDate) return alert("Select Date");
@@ -354,7 +379,7 @@ export default function App() {
       setExtraWorkDate('');
       setExtraWorkReason('');
       await fetchAttendance();
-      alert("Extra Working Day Logged!");
+      triggerToast("Extra Day Logged! 👍", `Extra working day saved for ${extraWorkDate}`);
     } else {
       alert("⚠️ Error saving record: " + error.message);
     }
@@ -549,7 +574,7 @@ export default function App() {
 
     setReminderSentMap(prev => ({ ...prev, [leaveItem.id]: true }));
     setIsSendingMail(false);
-    alert(`Day-2 Escalation Reminder Email Sent to ${hrEmailAddress}!`);
+    triggerToast("Reminder Sent! 📩", `Escalation mail sent to ${hrEmailAddress}`);
   };
 
   const handleAddHoliday = (e) => {
@@ -562,6 +587,89 @@ export default function App() {
 
   const handleDeleteHoliday = (id) => {
     setCompanyHolidays(companyHolidays.filter(h => h.id !== id));
+  };
+
+  // CALENDAR GENERATOR HELPER
+  const renderInteractiveCalendar = () => {
+    const daysInMonth = new Date(calendarViewYear, calendarViewMonth + 1, 0).getDate();
+    const firstDayIndex = new Date(calendarViewYear, calendarViewMonth, 1).getDay();
+    const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+    const days = [];
+    for (let i = 0; i < firstDayIndex; i++) {
+      days.push(<div key={`empty-${i}`} className="h-10"></div>);
+    }
+
+    for (let day = 1; day <= daysInMonth; day++) {
+      const formattedMonth = String(calendarViewMonth + 1).padStart(2, '0');
+      const formattedDay = String(day).padStart(2, '0');
+      const fullDateStr = `${calendarViewYear}-${formattedMonth}-${formattedDay}`;
+
+      const rec = attendanceRecords.find(r => r.date === fullDateStr);
+      const isToday = fullDateStr === todayStr;
+
+      let cellStyle = "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100";
+      if (rec?.status === 'Present') cellStyle = "bg-emerald-500 text-white font-black shadow-md shadow-emerald-500/30";
+      if (rec?.status === 'Absent') cellStyle = "bg-rose-500 text-white font-black shadow-md shadow-rose-500/30";
+
+      days.push(
+        <button
+          key={day}
+          onClick={() => {
+            setSelectedCalendarDate(fullDateStr);
+            if (dateMode === 'single') setSingleDate(fullDateStr);
+          }}
+          className={`h-11 rounded-xl border flex flex-col items-center justify-center transition-all text-xs font-bold relative ${cellStyle} ${isToday ? 'ring-2 ring-indigo-600 ring-offset-1' : ''}`}
+        >
+          <span>{day}</span>
+          {rec && <span className="text-[9px] uppercase tracking-tighter opacity-90">{rec.status}</span>}
+        </button>
+      );
+    }
+
+    return (
+      <div className="space-y-3">
+        <div className="flex items-center justify-between bg-slate-100 p-2.5 rounded-xl border border-slate-200">
+          <button 
+            onClick={() => {
+              if (calendarViewMonth === 0) {
+                setCalendarViewMonth(11);
+                setCalendarViewYear(calendarViewYear - 1);
+              } else {
+                setCalendarViewMonth(calendarViewMonth - 1);
+              }
+            }}
+            className="px-2.5 py-1 bg-white border border-slate-300 rounded-lg text-xs font-bold shadow-sm"
+          >
+            ◀
+          </button>
+          <span className="font-extrabold text-xs text-slate-800 uppercase tracking-wider">
+            {monthNames[calendarViewMonth]} {calendarViewYear}
+          </span>
+          <button 
+            onClick={() => {
+              if (calendarViewMonth === 11) {
+                setCalendarViewMonth(0);
+                setCalendarViewYear(calendarViewYear + 1);
+              } else {
+                setCalendarViewMonth(calendarViewMonth + 1);
+              }
+            }}
+            className="px-2.5 py-1 bg-white border border-slate-300 rounded-lg text-xs font-bold shadow-sm"
+          >
+            ▶
+          </button>
+        </div>
+
+        <div className="grid grid-cols-7 gap-1 text-center font-bold text-[10px] text-slate-400 uppercase">
+          <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
+        </div>
+
+        <div className="grid grid-cols-7 gap-1">
+          {days}
+        </div>
+      </div>
+    );
   };
 
   // ACTION SCREENS (HR / OWNER RESPONSE)
@@ -704,7 +812,23 @@ export default function App() {
 
   // MAIN SYSTEM APP
   return (
-    <div className="min-h-screen w-full flex flex-col md:flex-row bg-slate-100 font-sans overflow-x-hidden">
+    <div className="min-h-screen w-full flex flex-col md:flex-row bg-slate-100 font-sans overflow-x-hidden relative">
+      
+      {/* FLOATING THUMBS UP POPUP TOAST */}
+      {toastNotification.show && (
+        <div className="fixed top-5 right-5 z-50 animate-bounce transition-all">
+          <div className="bg-slate-900/95 backdrop-blur-md text-white border border-emerald-500/40 p-4 rounded-2xl shadow-2xl flex items-center gap-3.5 max-w-sm">
+            <div className="w-12 h-12 bg-emerald-500/20 border border-emerald-500/40 rounded-xl flex items-center justify-center text-2xl shrink-0">
+              👍
+            </div>
+            <div>
+              <h4 className="font-extrabold text-sm text-emerald-400">{toastNotification.title}</h4>
+              <p className="text-xs text-slate-300 font-medium leading-snug">{toastNotification.message}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showSuccessModal && currentMailData && (
         <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl p-6 max-w-lg w-full shadow-2xl border border-slate-100">
@@ -803,7 +927,7 @@ export default function App() {
           </div>
           <div className="flex items-center gap-2">
             <button 
-              onClick={markTodayAttendance} 
+              onClick={() => handleMarkDateAttendance(todayStr)} 
               disabled={!!todayRecord} 
               className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition shadow-sm ${todayRecord ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-indigo-600 text-white hover:bg-indigo-500'}`}
             >
@@ -926,7 +1050,7 @@ export default function App() {
                             )}
                             <button 
                               onClick={() => handleDeleteLeave(item.id)}
-                              className="px-2 py-1 text-[11px] font-bold rounded-lg border bg-rose-50 text-rose-600 border-rose-200 transition"
+                              className="px-2 py-1 text-[11px] font-bold rounded-lg border bg-rose-50 text-rose-600 border-rose-200 transition hover:bg-rose-600 hover:text-white"
                             >
                               🗑️
                             </button>
@@ -941,44 +1065,75 @@ export default function App() {
           </div>
         )}
 
-        {/* ATTENDANCE TAB WITH LIVE LOG TABLE & AUTO-ABSENT LABELS */}
+        {/* ATTENDANCE TAB WITH LIVE CALENDAR & DELETE BUTTON */}
         {activeTab === 'attendance' && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
-              <h3 className="text-lg font-extrabold text-slate-900 mb-4">Attendance History Log</h3>
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs border-collapse">
-                  <thead>
-                    <tr className="border-b border-slate-200 text-slate-400 font-bold uppercase">
-                      <th className="py-3 px-2">Date</th>
-                      <th className="py-3 px-2">Status</th>
-                      <th className="py-3 px-2">Work Type</th>
-                      <th className="py-3 px-2">Note</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {attendanceRecords.length === 0 ? (
-                      <tr><td colSpan="4" className="py-4 text-center text-slate-400">No attendance records found yet.</td></tr>
-                    ) : (
-                      attendanceRecords.map(r => (
-                        <tr key={r.id || r.date}>
-                          <td className="py-3 px-2 font-bold">{r.date}</td>
-                          <td className="py-3 px-2">
-                            <span className={`px-2 py-0.5 rounded font-bold ${r.status === 'Present' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>
-                              {r.status}
-                            </span>
-                          </td>
-                          <td className="py-3 px-2 font-semibold text-slate-600">{r.type}</td>
-                          <td className="py-3 px-2 text-slate-500">{r.note}</td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
+            <div className="lg:col-span-2 space-y-6">
+              
+              {/* INTERACTIVE CALENDAR FOR BACK-DATE ATTENDANCE */}
+              <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-4">
+                  <div>
+                    <h3 className="text-lg font-extrabold text-slate-900">Interactive Attendance Calendar</h3>
+                    <p className="text-xs text-slate-500 font-medium">Click any past date to mark attendance for missed days.</p>
+                  </div>
+                  <button 
+                    onClick={() => handleMarkDateAttendance(selectedCalendarDate)}
+                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-lg transition shadow-sm"
+                  >
+                    📍 Mark {selectedCalendarDate}
+                  </button>
+                </div>
+
+                {renderInteractiveCalendar()}
+              </div>
+
+              {/* TABLE WITH DELETE BUTTON ACCESSIBLE ON DASHBOARD */}
+              <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                <h3 className="text-lg font-extrabold text-slate-900 mb-4">Attendance History Log</h3>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="border-b border-slate-200 text-slate-400 font-bold uppercase">
+                        <th className="py-3 px-2">Date</th>
+                        <th className="py-3 px-2">Status</th>
+                        <th className="py-3 px-2">Work Type</th>
+                        <th className="py-3 px-2">Note</th>
+                        <th className="py-3 px-2 text-right">Delete</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {attendanceRecords.length === 0 ? (
+                        <tr><td colSpan="5" className="py-4 text-center text-slate-400">No attendance records found yet.</td></tr>
+                      ) : (
+                        attendanceRecords.map(r => (
+                          <tr key={r.id || r.date}>
+                            <td className="py-3 px-2 font-bold">{r.date}</td>
+                            <td className="py-3 px-2">
+                              <span className={`px-2 py-0.5 rounded font-bold ${r.status === 'Present' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>
+                                {r.status}
+                              </span>
+                            </td>
+                            <td className="py-3 px-2 font-semibold text-slate-600">{r.type}</td>
+                            <td className="py-3 px-2 text-slate-500">{r.note}</td>
+                            <td className="py-3 px-2 text-right">
+                              <button 
+                                onClick={() => handleDeleteAttendanceRecord(r.date)}
+                                className="px-2 py-1 text-[11px] font-bold rounded-lg border bg-rose-50 text-rose-600 border-rose-200 transition hover:bg-rose-600 hover:text-white"
+                              >
+                                🗑️ Delete
+                              </button>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
 
-            <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 space-y-4">
+            <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 space-y-4 h-fit">
               <h3 className="text-lg font-extrabold text-slate-900">Log Extra Weekend Working</h3>
               <form onSubmit={handleAddExtraWork} className="space-y-3">
                 <div>
