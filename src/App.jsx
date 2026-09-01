@@ -481,7 +481,7 @@ export default function App() {
             </div>
 
             <div className="relative z-10 text-xs text-indigo-300 font-medium">
-              Enterprise Attendance System
+              Enterprise Attendance System Developed By Sanju Sanwal
             </div>
           </div>
 
