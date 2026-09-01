@@ -45,7 +45,6 @@ export default function App() {
   const [cfYearInput, setCfYearInput] = useState('2025');
   const [cfDaysInput, setCfDaysInput] = useState('');
 
-  // Total Carry Forward calculated from year-wise history
   const clCarryForward = carryForwardHistory.reduce((acc, curr) => acc + Number(curr.days || 0), 0);
 
   const [slQuota, setSlQuota] = useState(() => Number(localStorage.getItem('ylp_sl_quota')) || 6);
@@ -438,8 +437,8 @@ export default function App() {
 
   if (hrActionState) {
     return (
-      <div className="w-screen h-screen flex items-center justify-center bg-slate-950 p-6 font-sans">
-        <div className="max-w-md w-full bg-white rounded-3xl p-8 text-center shadow-2xl border border-slate-800">
+      <div className="min-h-screen w-full flex items-center justify-center bg-slate-950 p-4 font-sans">
+        <div className="max-w-md w-full bg-white rounded-3xl p-6 md:p-8 text-center shadow-2xl border border-slate-800">
           {hrActionState === 'processing' && (
             <div className="py-8">
               <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
@@ -490,9 +489,9 @@ export default function App() {
 
   if (!isLoggedIn) {
     return (
-      <div className="w-screen h-screen flex items-center justify-center bg-slate-950 p-4 relative overflow-hidden">
-        <div className="w-full max-w-5xl h-[580px] bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col md:flex-row border border-slate-800 relative z-10">
-          <div className="w-full md:w-1/2 relative bg-indigo-950 flex flex-col justify-between p-10 text-white overflow-hidden">
+      <div className="min-h-screen w-full flex items-center justify-center bg-slate-950 p-4 relative overflow-y-auto">
+        <div className="w-full max-w-4xl min-h-[500px] bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col md:flex-row border border-slate-800 relative z-10 my-auto">
+          <div className="w-full md:w-1/2 relative bg-indigo-950 flex flex-col justify-between p-6 md:p-10 text-white overflow-hidden min-h-[220px] md:min-h-full">
             {bgImages.map((img, i) => (
               <div
                 key={i}
@@ -502,33 +501,33 @@ export default function App() {
             ))}
 
             <div className="relative z-10">
-              <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/10 backdrop-blur-md rounded-full text-xs font-semibold mb-4 border border-white/20">
+              <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/10 backdrop-blur-md rounded-full text-xs font-semibold mb-3 border border-white/20">
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
                 Corporate Workspace
               </div>
-              <h2 className="text-4xl font-extrabold tracking-tight">Your Learning Portal</h2>
+              <h2 className="text-2xl md:text-4xl font-extrabold tracking-tight">Your Learning Portal</h2>
             </div>
 
-            <div className="relative z-10 text-xs text-indigo-300 font-medium">
+            <div className="relative z-10 text-xs text-indigo-300 font-medium mt-4 md:mt-0">
               Enterprise Attendance System
             </div>
           </div>
 
-          <div className="w-full md:w-1/2 bg-white p-10 flex flex-col justify-center">
-            <div className="mb-8">
-              <h3 className="text-3xl font-extrabold text-slate-900">Sign In</h3>
+          <div className="w-full md:w-1/2 bg-white p-6 md:p-10 flex flex-col justify-center">
+            <div className="mb-6">
+              <h3 className="text-2xl md:text-3xl font-extrabold text-slate-900">Sign In</h3>
               <p className="text-slate-500 text-xs mt-1">Enter credentials for Your Learning Portal</p>
             </div>
 
             {loginError && (
-              <div className="mb-5 p-3 bg-rose-50 border border-rose-200 text-rose-600 rounded-xl text-xs font-semibold">
+              <div className="mb-4 p-3 bg-rose-50 border border-rose-200 text-rose-600 rounded-xl text-xs font-semibold">
                 ⚠️ {loginError}
               </div>
             )}
 
             <form onSubmit={handleLogin} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">USERNAME</label>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">USERNAME</label>
                 <input 
                   type="text" 
                   required
@@ -540,7 +539,7 @@ export default function App() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">PASSWORD</label>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">PASSWORD</label>
                 <input 
                   type="password" 
                   required
@@ -565,7 +564,7 @@ export default function App() {
   }
 
   return (
-    <div className="w-screen h-screen flex bg-slate-100 overflow-hidden relative font-sans">
+    <div className="min-h-screen w-full flex flex-col md:flex-row bg-slate-100 font-sans">
       {showSuccessModal && currentMailData && (
         <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl p-6 max-w-lg w-full shadow-2xl border border-slate-100">
@@ -574,7 +573,7 @@ export default function App() {
                 ✉️
               </div>
               <div className="text-left">
-                <h3 className="text-lg font-extrabold text-slate-900">Leave Submitted & Email Dispatched</h3>
+                <h3 className="text-base md:text-lg font-extrabold text-slate-900">Leave Submitted & Email Dispatched</h3>
                 <p className="text-xs text-slate-500 font-semibold">Real email notification sent to HR ({currentMailData.to})</p>
               </div>
             </div>
@@ -597,40 +596,49 @@ export default function App() {
         </div>
       )}
 
-      {/* Sidebar Navigation */}
-      <aside className="w-72 h-full bg-slate-900 text-slate-300 flex flex-col justify-between shrink-0">
+      {/* Responsive Navigation Sidebar / Top Header */}
+      <aside className="w-full md:w-64 lg:w-72 bg-slate-900 text-slate-300 flex flex-col justify-between shrink-0">
         <div>
-          <div className="p-6 border-b border-slate-800 flex items-center gap-3">
-            <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white font-black text-lg shadow-lg">Y</div>
-            <div>
-              <h1 className="font-extrabold text-white text-base leading-tight">Your Learning</h1>
-              <span className="text-xs text-indigo-400 font-medium">Portal System</span>
+          <div className="p-4 md:p-6 border-b border-slate-800 flex items-center justify-between md:justify-start gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 md:w-10 md:h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white font-black text-lg shadow-lg">Y</div>
+              <div>
+                <h1 className="font-extrabold text-white text-sm md:text-base leading-tight">Your Learning</h1>
+                <span className="text-[10px] md:text-xs text-indigo-400 font-medium">Portal System</span>
+              </div>
             </div>
+            
+            <button 
+              onClick={handleSignOut}
+              className="md:hidden px-3 py-1.5 bg-red-600/10 hover:bg-red-600 text-red-400 hover:text-white text-xs font-bold rounded-lg border border-red-600/20"
+            >
+              Sign Out
+            </button>
           </div>
           
-          <nav className="p-4 space-y-2">
+          <nav className="p-2 md:p-4 flex md:flex-col overflow-x-auto gap-1 md:gap-2">
             <button 
               onClick={() => setActiveTab('dashboard')}
-              className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-bold transition ${activeTab === 'dashboard' ? 'bg-indigo-600 text-white shadow-lg' : 'hover:bg-slate-800 text-slate-400'}`}
+              className={`whitespace-nowrap flex-1 md:w-full flex items-center justify-center md:justify-start gap-2 md:gap-3 px-3.5 py-2.5 md:py-3.5 rounded-xl text-xs md:text-sm font-bold transition ${activeTab === 'dashboard' ? 'bg-indigo-600 text-white shadow-lg' : 'hover:bg-slate-800 text-slate-400'}`}
             >
-              📊 Dashboard
+              📊 <span>Dashboard</span>
             </button>
             <button 
               onClick={() => setActiveTab('calendar')}
-              className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-bold transition ${activeTab === 'calendar' ? 'bg-indigo-600 text-white shadow-lg' : 'hover:bg-slate-800 text-slate-400'}`}
+              className={`whitespace-nowrap flex-1 md:w-full flex items-center justify-center md:justify-start gap-2 md:gap-3 px-3.5 py-2.5 md:py-3.5 rounded-xl text-xs md:text-sm font-bold transition ${activeTab === 'calendar' ? 'bg-indigo-600 text-white shadow-lg' : 'hover:bg-slate-800 text-slate-400'}`}
             >
-              📅 Calendar & Apply Leave
+              📅 <span>Apply Leave</span>
             </button>
             <button 
               onClick={() => setActiveTab('settings')}
-              className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-bold transition ${activeTab === 'settings' ? 'bg-indigo-600 text-white shadow-lg' : 'hover:bg-slate-800 text-slate-400'}`}
+              className={`whitespace-nowrap flex-1 md:w-full flex items-center justify-center md:justify-start gap-2 md:gap-3 px-3.5 py-2.5 md:py-3.5 rounded-xl text-xs md:text-sm font-bold transition ${activeTab === 'settings' ? 'bg-indigo-600 text-white shadow-lg' : 'hover:bg-slate-800 text-slate-400'}`}
             >
-              ⚙️ Annual Quota & HR Email
+              ⚙️ <span>Settings</span>
             </button>
           </nav>
         </div>
 
-        <div className="p-4 border-t border-slate-800">
+        <div className="hidden md:block p-4 border-t border-slate-800">
           <button 
             onClick={handleSignOut}
             className="w-full py-3 bg-red-600/10 hover:bg-red-600 text-red-400 hover:text-white font-bold rounded-xl text-sm transition border border-red-600/20"
@@ -640,39 +648,38 @@ export default function App() {
         </div>
       </aside>
 
-      {/* Main App Section */}
-      <main className="flex-1 h-full p-8 overflow-y-auto">
-        <header className="flex justify-between items-center mb-8 pb-5 border-b border-slate-200">
+      {/* Main Content View */}
+      <main className="flex-1 w-full p-4 md:p-8 overflow-y-auto">
+        <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-6 md:mb-8 pb-4 border-b border-slate-200">
           <div>
-            <h1 className="text-3xl font-extrabold text-slate-900">Welcome, {currentUser.name}</h1>
-            <p className="text-sm text-slate-500 font-semibold mt-0.5">{currentUser.employeeId} | Joined: {currentUser.joiningDate}</p>
+            <h1 className="text-xl md:text-3xl font-extrabold text-slate-900">Welcome, {currentUser.name}</h1>
+            <p className="text-xs md:text-sm text-slate-500 font-semibold mt-0.5">{currentUser.employeeId} | Joined: {currentUser.joiningDate}</p>
           </div>
-          <div className="flex items-center gap-3">
-            <span className="text-xs text-slate-400 font-semibold hidden sm:inline">Last Sync: {lastSyncedTime || 'Just now'}</span>
-          </div>
+          <span className="text-[11px] md:text-xs text-slate-400 font-semibold bg-white px-3 py-1.5 rounded-lg border border-slate-200">
+            Last Sync: {lastSyncedTime || 'Just now'}
+          </span>
         </header>
 
         {/* DASHBOARD TAB */}
         {activeTab === 'dashboard' && (
-          <div className="space-y-8">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+          <div className="space-y-6 md:space-y-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5">
+              <div className="bg-white p-5 md:p-6 rounded-2xl shadow-sm border border-slate-200">
                 <p className="text-xs font-bold text-slate-400 uppercase mb-1">CASUAL LEAVE (CL)</p>
                 <div className="flex justify-between items-end mb-3">
-                  <span className="text-4xl font-black text-indigo-600">{remainingCL}</span>
-                  <span className="text-xs text-slate-400 font-semibold">of {totalAvailableCL} Total ({clQuota} Quota + {clCarryForward} CF)</span>
+                  <span className="text-3xl md:text-4xl font-black text-indigo-600">{remainingCL}</span>
+                  <span className="text-[11px] md:text-xs text-slate-400 font-semibold">of {totalAvailableCL} Total</span>
                 </div>
                 
-                {/* Year-Wise Carry Forward Breakdown Display */}
                 <div className="border-t border-slate-100 pt-2.5">
-                  <p className="text-[11px] font-bold text-slate-400 uppercase mb-1.5">Carry Forward Breakdown:</p>
+                  <p className="text-[10px] md:text-[11px] font-bold text-slate-400 uppercase mb-1.5">Carry Forward Breakdown:</p>
                   <div className="flex flex-wrap gap-1.5">
                     {carryForwardHistory.length === 0 ? (
                       <span className="text-xs text-slate-400 italic">No carry forward</span>
                     ) : (
                       carryForwardHistory.map(item => (
-                        <span key={item.id} className="px-2 py-0.5 bg-indigo-50 border border-indigo-100 text-indigo-700 text-xs font-bold rounded-md">
-                          {item.year}: {item.days} Days
+                        <span key={item.id} className="px-2 py-0.5 bg-indigo-50 border border-indigo-100 text-indigo-700 text-[11px] font-bold rounded-md">
+                          {item.year}: {item.days}D
                         </span>
                       ))
                     )}
@@ -680,98 +687,100 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+              <div className="bg-white p-5 md:p-6 rounded-2xl shadow-sm border border-slate-200">
                 <p className="text-xs font-bold text-slate-400 uppercase mb-1">SICK LEAVE (SL)</p>
                 <div className="flex justify-between items-end">
-                  <span className="text-4xl font-black text-rose-500">{remainingSL}</span>
-                  <span className="text-xs text-slate-400 font-semibold">of {slQuota} Days Left</span>
+                  <span className="text-3xl md:text-4xl font-black text-rose-500">{remainingSL}</span>
+                  <span className="text-[11px] md:text-xs text-slate-400 font-semibold">of {slQuota} Days Left</span>
                 </div>
               </div>
 
-              <div className={`p-6 rounded-2xl shadow-sm border ${isSabbaticalEligible ? 'bg-amber-50/50 border-amber-200' : 'bg-slate-100 border-slate-200 opacity-60'}`}>
+              <div className={`p-5 md:p-6 rounded-2xl shadow-sm border ${isSabbaticalEligible ? 'bg-amber-50/50 border-amber-200' : 'bg-slate-100 border-slate-200 opacity-60'}`}>
                 <p className="text-xs font-bold text-amber-700 uppercase mb-1">⭐ SABBATICAL (3 YRS)</p>
                 <div className="flex justify-between items-end">
-                  <span className="text-4xl font-black text-amber-600">{remainingSabbatical}</span>
+                  <span className="text-3xl md:text-4xl font-black text-amber-600">{remainingSabbatical}</span>
                 </div>
               </div>
 
-              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+              <div className="bg-white p-5 md:p-6 rounded-2xl shadow-sm border border-slate-200">
                 <p className="text-xs font-bold text-slate-400 uppercase mb-1">TOTAL LEAVES USED</p>
                 <div className="flex justify-between items-end">
-                  <span className="text-4xl font-black text-emerald-600">{usedCL + usedSL + usedSabbatical}</span>
+                  <span className="text-3xl md:text-4xl font-black text-emerald-600">{usedCL + usedSL + usedSabbatical}</span>
                 </div>
               </div>
             </div>
 
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-bold text-slate-800">Leave Application Records</h3>
+            <div className="bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-slate-200">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
+                <h3 className="text-base md:text-lg font-bold text-slate-800">Leave Application Records</h3>
                 
                 <button
                   onClick={() => fetchLeaves(true)}
                   disabled={isFetchingData}
-                  className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold flex items-center gap-2 border border-slate-300 transition shadow-sm active:scale-95"
+                  className="w-full sm:w-auto px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold flex items-center justify-center gap-2 border border-slate-300 transition shadow-sm active:scale-95"
                 >
                   <span className={`text-sm ${isFetchingData ? 'animate-spin' : ''}`}>🔄</span>
                   {isFetchingData ? 'Updating Status...' : 'Refresh Data'}
                 </button>
               </div>
 
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse text-sm">
-                  <thead>
-                    <tr className="border-b border-slate-200 text-slate-400 font-bold text-xs uppercase">
-                      <th className="py-3 px-4">Type</th>
-                      <th className="py-3 px-4">Date / Range</th>
-                      <th className="py-3 px-4">Duration</th>
-                      <th className="py-3 px-4">Reason</th>
-                      <th className="py-3 px-4">Status</th>
-                      <th className="py-3 px-4 text-right">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {appliedLeaves.length === 0 ? (
-                      <tr>
-                        <td colSpan="6" className="py-6 text-center text-slate-400">No leave records found.</td>
+              <div className="overflow-x-auto -mx-4 md:mx-0">
+                <div className="inline-block min-w-full align-middle px-4 md:px-0">
+                  <table className="min-w-full text-left border-collapse text-xs md:text-sm">
+                    <thead>
+                      <tr className="border-b border-slate-200 text-slate-400 font-bold text-[11px] uppercase">
+                        <th className="py-3 px-3 md:px-4">Type</th>
+                        <th className="py-3 px-3 md:px-4">Date / Range</th>
+                        <th className="py-3 px-3 md:px-4">Days</th>
+                        <th className="py-3 px-3 md:px-4">Reason</th>
+                        <th className="py-3 px-3 md:px-4">Status</th>
+                        <th className="py-3 px-3 md:px-4 text-right">Action</th>
                       </tr>
-                    ) : (
-                      appliedLeaves.map(item => (
-                        <tr key={item.id} className="hover:bg-slate-50 transition">
-                          <td className="py-3.5 px-4 font-bold">
-                            <span className={`px-2.5 py-1 rounded text-xs ${item.category === 'CL' ? 'bg-indigo-100 text-indigo-700' : item.category === 'SL' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-800 font-extrabold'}`}>
-                              {item.category}
-                            </span>
-                          </td>
-                          <td className="py-3.5 px-4 font-semibold text-slate-800">{item.date_str || item.dateStr}</td>
-                          <td className="py-3.5 px-4 font-semibold text-slate-600">{item.days_count || item.daysCount} Day(s)</td>
-                          <td className="py-3.5 px-4 text-slate-500 font-medium">{item.reason}</td>
-                          <td className="py-3.5 px-4">
-                            <span className={`px-3 py-1 rounded-full text-xs font-bold ${item.status === 'Approved' ? 'bg-emerald-100 text-emerald-800' : item.status === 'Rejected' ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800'}`}>
-                              {item.status}
-                            </span>
-                          </td>
-                          <td className="py-3.5 px-4 text-right space-x-2">
-                            {item.status === 'Pending HR Approval' && (
-                              <button
-                                onClick={() => handleSendReminderMail(item)}
-                                disabled={isSendingMail || reminderSentMap[item.id]}
-                                className={`px-3 py-1 text-xs font-bold rounded-lg border transition ${reminderSentMap[item.id] ? 'bg-slate-100 text-slate-400 border-slate-200' : 'bg-amber-50 text-amber-700 hover:bg-amber-600 hover:text-white border-amber-300'}`}
-                              >
-                                {reminderSentMap[item.id] ? 'Reminder Sent' : '📩 Remind HR'}
-                              </button>
-                            )}
-                            <button 
-                              onClick={() => handleDeleteLeave(item.id)}
-                              className="px-3 py-1 text-xs font-bold rounded-lg border bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white border-rose-200 transition"
-                            >
-                              🗑️ Delete
-                            </button>
-                          </td>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {appliedLeaves.length === 0 ? (
+                        <tr>
+                          <td colSpan="6" className="py-6 text-center text-slate-400">No leave records found.</td>
                         </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
+                      ) : (
+                        appliedLeaves.map(item => (
+                          <tr key={item.id} className="hover:bg-slate-50 transition">
+                            <td className="py-3 px-3 md:px-4 font-bold">
+                              <span className={`px-2 py-0.5 rounded text-[11px] ${item.category === 'CL' ? 'bg-indigo-100 text-indigo-700' : item.category === 'SL' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-800 font-extrabold'}`}>
+                                {item.category}
+                              </span>
+                            </td>
+                            <td className="py-3 px-3 md:px-4 font-semibold text-slate-800 whitespace-nowrap">{item.date_str || item.dateStr}</td>
+                            <td className="py-3 px-3 md:px-4 font-semibold text-slate-600 whitespace-nowrap">{item.days_count || item.daysCount}D</td>
+                            <td className="py-3 px-3 md:px-4 text-slate-500 font-medium max-w-[150px] truncate">{item.reason}</td>
+                            <td className="py-3 px-3 md:px-4">
+                              <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold whitespace-nowrap ${item.status === 'Approved' ? 'bg-emerald-100 text-emerald-800' : item.status === 'Rejected' ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800'}`}>
+                                {item.status}
+                              </span>
+                            </td>
+                            <td className="py-3 px-3 md:px-4 text-right whitespace-nowrap space-x-1">
+                              {item.status === 'Pending HR Approval' && (
+                                <button
+                                  onClick={() => handleSendReminderMail(item)}
+                                  disabled={isSendingMail || reminderSentMap[item.id]}
+                                  className={`px-2 py-1 text-[11px] font-bold rounded-lg border transition ${reminderSentMap[item.id] ? 'bg-slate-100 text-slate-400 border-slate-200' : 'bg-amber-50 text-amber-700 border-amber-300'}`}
+                                >
+                                  {reminderSentMap[item.id] ? 'Sent' : '📩 Remind'}
+                                </button>
+                              )}
+                              <button 
+                                onClick={() => handleDeleteLeave(item.id)}
+                                className="px-2 py-1 text-[11px] font-bold rounded-lg border bg-rose-50 text-rose-600 border-rose-200 transition"
+                              >
+                                🗑️
+                              </button>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           </div>
@@ -779,13 +788,13 @@ export default function App() {
 
         {/* CALENDAR & APPLY LEAVE TAB */}
         {activeTab === 'calendar' && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-              <h3 className="text-xl font-extrabold text-slate-900 mb-6">Apply Leave Request</h3>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
+            <div className="lg:col-span-2 bg-white p-5 md:p-6 rounded-2xl shadow-sm border border-slate-200">
+              <h3 className="text-lg md:text-xl font-extrabold text-slate-900 mb-5">Apply Leave Request</h3>
 
-              <form onSubmit={handleApplyLeave} className="space-y-5">
+              <form onSubmit={handleApplyLeave} className="space-y-4 md:space-y-5">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase mb-2">Leave Category</label>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">Leave Category</label>
                   <select 
                     value={leaveCategory}
                     onChange={e => setLeaveCategory(e.target.value)}
@@ -800,8 +809,8 @@ export default function App() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase mb-2">Duration Selection</label>
-                  <div className="flex gap-4">
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">Duration Selection</label>
+                  <div className="flex flex-wrap gap-4">
                     <label className="flex items-center gap-2 cursor-pointer text-sm font-semibold text-slate-700">
                       <input 
                         type="radio" 
@@ -818,14 +827,14 @@ export default function App() {
                         value="range" 
                         checked={dateMode === 'range'} 
                         onChange={() => setDateMode('range')}
-                      /> Date Range (Multiple Days)
+                      /> Multiple Days
                     </label>
                   </div>
                 </div>
 
                 {dateMode === 'single' ? (
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 uppercase mb-2">Select Date</label>
+                    <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">Select Date</label>
                     <input 
                       type="date" 
                       value={singleDate}
@@ -834,9 +843,9 @@ export default function App() {
                     />
                   </div>
                 ) : (
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-bold text-slate-700 uppercase mb-2">Start Date</label>
+                      <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">Start Date</label>
                       <input 
                         type="date" 
                         value={startDate}
@@ -845,7 +854,7 @@ export default function App() {
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-slate-700 uppercase mb-2">End Date</label>
+                      <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">End Date</label>
                       <input 
                         type="date" 
                         value={endDate}
@@ -857,7 +866,7 @@ export default function App() {
                 )}
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase mb-2">
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">
                     Reason for Leave <span className="text-rose-600 font-bold">* Mandatory</span>
                   </label>
                   <textarea 
@@ -874,16 +883,16 @@ export default function App() {
                 <button 
                   type="submit"
                   disabled={isSendingMail}
-                  className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold rounded-xl shadow-lg transition border border-white/20 text-sm"
+                  className="w-full py-3.5 md:py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold rounded-xl shadow-lg transition border border-white/20 text-sm"
                 >
                   {isSendingMail ? 'Sending Mail to HR...' : 'Submit Leave Request & Send Email'}
                 </button>
               </form>
             </div>
 
-            {/* Holidays List */}
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-6">
-              <h3 className="text-xl font-extrabold text-slate-900">Company Holidays</h3>
+            {/* Company Holidays */}
+            <div className="bg-white p-5 md:p-6 rounded-2xl shadow-sm border border-slate-200 space-y-5">
+              <h3 className="text-lg md:text-xl font-extrabold text-slate-900">Company Holidays</h3>
 
               <form onSubmit={handleAddHoliday} className="space-y-3 pb-4 border-b border-slate-200">
                 <input 
@@ -904,7 +913,7 @@ export default function App() {
                 </button>
               </form>
 
-              <div className="space-y-2 max-h-80 overflow-y-auto">
+              <div className="space-y-2 max-h-64 md:max-h-80 overflow-y-auto">
                 {companyHolidays.map(h => (
                   <div key={h.id} className="flex justify-between items-center p-3 bg-slate-50 rounded-xl border border-slate-100">
                     <div>
@@ -926,8 +935,8 @@ export default function App() {
 
         {/* SETTINGS TAB */}
         {activeTab === 'settings' && (
-          <div className="max-w-3xl bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-6">
-            <h3 className="text-xl font-extrabold text-slate-900">Portal Configuration & HR Setup</h3>
+          <div className="max-w-3xl bg-white p-5 md:p-6 rounded-2xl shadow-sm border border-slate-200 space-y-6">
+            <h3 className="text-lg md:text-xl font-extrabold text-slate-900">Portal Configuration & HR Setup</h3>
 
             <div className="space-y-5">
               <div>
@@ -942,29 +951,29 @@ export default function App() {
 
               {/* Year-Wise Carry Forward Management Section */}
               <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-4">
-                <div className="flex justify-between items-center">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-1">
                   <div>
                     <h4 className="font-bold text-slate-900 text-sm">CL Carry Forward (Yearly Breakdown)</h4>
                     <p className="text-xs text-slate-500 font-semibold">Total Carry Forward: <span className="font-black text-indigo-600">{clCarryForward} Days</span></p>
                   </div>
                 </div>
 
-                <form onSubmit={handleAddCarryForward} className="flex gap-2">
+                <form onSubmit={handleAddCarryForward} className="flex flex-col sm:flex-row gap-2">
                   <input 
                     type="text" 
                     placeholder="Year (e.g. 2025)"
                     value={cfYearInput}
                     onChange={e => setCfYearInput(e.target.value)}
-                    className="w-1/3 px-3 py-2 rounded-xl bg-white border border-slate-200 font-semibold text-xs"
+                    className="w-full sm:w-1/3 px-3 py-2 rounded-xl bg-white border border-slate-200 font-semibold text-xs"
                   />
                   <input 
                     type="number" 
                     placeholder="Days (e.g. 10)"
                     value={cfDaysInput}
                     onChange={e => setCfDaysInput(e.target.value)}
-                    className="w-1/3 px-3 py-2 rounded-xl bg-white border border-slate-200 font-semibold text-xs"
+                    className="w-full sm:w-1/3 px-3 py-2 rounded-xl bg-white border border-slate-200 font-semibold text-xs"
                   />
-                  <button type="submit" className="w-1/3 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-xs shadow-md">
+                  <button type="submit" className="w-full sm:w-1/3 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-xs shadow-md">
                     + Add Year Entry
                   </button>
                 </form>
@@ -984,7 +993,7 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Annual CL Quota</label>
                   <input 
