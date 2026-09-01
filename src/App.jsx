@@ -7,43 +7,30 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 export default function App() {
-  // Action Handled view for HR Email Click
-  const [hrActionState, setHrActionState] = useState(null); // null, 'processing', 'success', 'already_done', 'error'
+  const [hrActionState, setHrActionState] = useState(null);
   const [hrActionDetails, setHrActionDetails] = useState({ status: '', leaveId: '' });
 
-  // Authentication State
-  const [isLoggedIn, setIsLoggedIn] = useState(() => {
-    return localStorage.getItem('ylp_isLoggedIn') === 'true';
-  });
-
+  const [isLoggedIn, setIsLoggedIn] = useState(() => localStorage.getItem('ylp_isLoggedIn') === 'true');
   const [usernameInput, setUsernameInput] = useState('');
   const [passwordInput, setPasswordInput] = useState('');
   const [loginError, setLoginError] = useState('');
-
-  // Navigation
   const [activeTab, setActiveTab] = useState('dashboard');
 
-  // Leave Balances
   const [clQuota, setClQuota] = useState(() => Number(localStorage.getItem('ylp_cl_quota')) || 12);
   const [clCarryForward, setClCarryForward] = useState(() => Number(localStorage.getItem('ylp_cl_carry')) || 0);
   const [slQuota, setSlQuota] = useState(() => Number(localStorage.getItem('ylp_sl_quota')) || 6);
   const [sabbaticalQuota, setSabbaticalQuota] = useState(() => Number(localStorage.getItem('ylp_sabbatical_quota')) || 30);
 
   const totalAvailableCL = clQuota + clCarryForward;
-
-  // HR Email Address
   const [hrEmailAddress, setHrEmailAddress] = useState(() => localStorage.getItem('ylp_hr_email') || 'sanju@yourlearnings.com');
   
   const [isSendingMail, setIsSendingMail] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [currentMailData, setCurrentMailData] = useState(null);
   
-  const [emailLogs, setEmailLogs] = useState(() => {
-    const saved = localStorage.getItem('ylp_email_logs');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [appliedLeaves, setAppliedLeaves] = useState([]);
+  const [reminderSentMap, setReminderSentMap] = useState({});
 
-  // Holidays
   const [companyHolidays, setCompanyHolidays] = useState(() => {
     const saved = localStorage.getItem('ylp_holidays');
     return saved ? JSON.parse(saved) : [
@@ -54,10 +41,6 @@ export default function App() {
     ];
   });
 
-  // Applied Leaves Logs
-  const [appliedLeaves, setAppliedLeaves] = useState([]);
-
-  // Form Controls
   const [leaveCategory, setLeaveCategory] = useState('CL');
   const [dateMode, setDateMode] = useState('single');
   const [singleDate, setSingleDate] = useState('');
@@ -65,21 +48,17 @@ export default function App() {
   const [endDate, setEndDate] = useState('');
   const [leaveReason, setLeaveReason] = useState('');
 
-  // Holiday Form Controls
   const [holidayDate, setHolidayDate] = useState('');
   const [holidayTitle, setHolidayTitle] = useState('');
 
-  // PERMANENT CREDENTIALS
   const VALID_USER = 'Sanju';
   const VALID_PASS = 'Admin@321';
   const JOINING_DATE = '2023-01-01';
 
-  // Check 3 Years Eligibility
   const checkThreeYearsCompleted = (joinDateStr) => {
     const joinDate = new Date(joinDateStr);
     const currentDate = new Date();
-    const diffInTime = currentDate.getTime() - joinDate.getTime();
-    const diffInDays = diffInTime / (1000 * 3600 * 24);
+    const diffInDays = (currentDate.getTime() - joinDate.getTime()) / (1000 * 3600 * 24);
     return diffInDays >= 1095;
   };
 
@@ -92,19 +71,17 @@ export default function App() {
     role: `Operations Lead (${isSabbaticalEligible ? '3+ Yrs Tenure' : 'Under 3 Yrs Tenure'})`
   };
 
-  // Sound & Confetti Effect
   const triggerPartyPopper = () => {
     try {
       const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2018/2018-preview.mp3');
       audio.play();
     } catch (err) {}
-
     if (window.confetti) {
       window.confetti({ particleCount: 120, spread: 80, origin: { y: 0.6 } });
     }
   };
 
-  // Database Fetch Function
+  // Fetch Directly from Supabase - Keeping Mail Logs in Sync with Database
   const fetchLeaves = async () => {
     const { data, error } = await supabase
       .from('leaves')
@@ -116,7 +93,6 @@ export default function App() {
     }
   };
 
-  // Check URL parameters for HR Email Approval/Rejection action
   useEffect(() => {
     const handleUrlAction = async () => {
       const urlParams = new URLSearchParams(window.location.search);
@@ -127,7 +103,6 @@ export default function App() {
         setHrActionState('processing');
         const targetStatus = action === 'approve' ? 'Approved' : 'Rejected';
 
-        // Check if leave already processed
         const { data: existingLeave, error: fetchErr } = await supabase
           .from('leaves')
           .select('status')
@@ -145,7 +120,6 @@ export default function App() {
           return;
         }
 
-        // Perform status update
         const { error: updateErr } = await supabase
           .from('leaves')
           .update({ status: targetStatus })
@@ -166,7 +140,6 @@ export default function App() {
   useEffect(() => {
     fetchLeaves();
 
-    // Realtime Sync for Auto Status Update & Hiding Reminder Buttons
     const channel = supabase
       .channel('schema-db-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'leaves' }, () => {
@@ -179,7 +152,6 @@ export default function App() {
     };
   }, [isLoggedIn]);
 
-  // Login Background Images
   const bgImages = [
     "https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=1600&q=80",
     "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1600&q=80",
@@ -196,7 +168,6 @@ export default function App() {
     }
   }, [isLoggedIn]);
 
-  // Local Storage Persistence
   useEffect(() => {
     localStorage.setItem('ylp_isLoggedIn', isLoggedIn ? 'true' : 'false');
     localStorage.setItem('ylp_cl_quota', clQuota.toString());
@@ -204,21 +175,17 @@ export default function App() {
     localStorage.setItem('ylp_sl_quota', slQuota.toString());
     localStorage.setItem('ylp_sabbatical_quota', sabbaticalQuota.toString());
     localStorage.setItem('ylp_holidays', JSON.stringify(companyHolidays));
-    localStorage.setItem('ylp_email_logs', JSON.stringify(emailLogs));
     localStorage.setItem('ylp_hr_email', hrEmailAddress);
-  }, [isLoggedIn, clQuota, clCarryForward, slQuota, sabbaticalQuota, companyHolidays, emailLogs, hrEmailAddress]);
+  }, [isLoggedIn, clQuota, clCarryForward, slQuota, sabbaticalQuota, companyHolidays, hrEmailAddress]);
 
-  // Welcome Speech
   const speakWelcomeMessage = () => {
     if ('speechSynthesis' in window) {
       const msg = new SpeechSynthesisUtterance("Welcome to login YL portal Sanju!");
       msg.rate = 0.95;
-      msg.pitch = 1;
       window.speechSynthesis.speak(msg);
     }
   };
 
-  // Leave Deductions
   const usedCL = appliedLeaves.filter(i => i.category === 'CL' && i.status === 'Approved').reduce((s, i) => s + (i.days_count || 1), 0);
   const usedSL = appliedLeaves.filter(i => i.category === 'SL' && i.status === 'Approved').reduce((s, i) => s + (i.days_count || 1), 0);
   const usedSabbatical = appliedLeaves.filter(i => i.category === 'Sabbatical' && i.status === 'Approved').reduce((s, i) => s + (i.days_count || 1), 0);
@@ -227,10 +194,8 @@ export default function App() {
   const remainingSL = slQuota - usedSL;
   const remainingSabbatical = sabbaticalQuota - usedSabbatical;
 
-  // Direct Vercel Web Approval links for EmailJS
   const sendRealMailToHR = async (mailPayload) => {
     setIsSendingMail(true);
-    
     if (window.emailjs) {
       try {
         const approveUrl = `https://your-learning-portal.vercel.app/?action=approve&id=${mailPayload.leaveId}`;
@@ -258,14 +223,12 @@ export default function App() {
           'O5FhcUXl6UTLrRv7n'
         );
       } catch (err) {
-        console.error("EmailJS sending error:", err);
+        console.error("EmailJS Error:", err);
       }
     }
-    
     setIsSendingMail(false);
   };
 
-  // Login Handler
   const handleLogin = (e) => {
     e.preventDefault();
     if (usernameInput.trim().toLowerCase() === VALID_USER.toLowerCase() && passwordInput === VALID_PASS) {
@@ -285,7 +248,6 @@ export default function App() {
     setActiveTab('dashboard');
   };
 
-  // Apply Leave Handler
   const handleApplyLeave = async (e) => {
     e.preventDefault();
 
@@ -301,20 +263,18 @@ export default function App() {
       const d1 = new Date(startDate);
       const d2 = new Date(endDate);
       if (d2 < d1) return alert('End Date must be after Start Date');
-      const diffTime = Math.abs(d2 - d1);
-      count = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+      count = Math.ceil(Math.abs(d2 - d1) / (1000 * 60 * 60 * 24)) + 1;
       dateStr = `${startDate} to ${endDate}`;
     }
 
     if (leaveCategory === 'Sabbatical' && !isSabbaticalEligible) {
-      return alert('Sabbatical leave is locked! Minimum 3 years company tenure required.');
+      return alert('Sabbatical leave is locked!');
     }
 
     if (leaveCategory === 'CL' && count > remainingCL) return alert(`Insufficient CL Balance! Only ${remainingCL} Days Left.`);
     if (leaveCategory === 'SL' && count > remainingSL) return alert(`Insufficient SL Balance! Only ${remainingSL} Days Left.`);
-    if (leaveCategory === 'Sabbatical' && count > remainingSabbatical) return alert(`Insufficient Sabbatical Balance! Only ${remainingSabbatical} Days Left.`);
+    if (leaveCategory === 'Sabbatical' && count > remainingSabbatical) return alert(`Insufficient Sabbatical Balance!`);
 
-    // Push to Supabase Database
     const { data, error } = await supabase
       .from('leaves')
       .insert([
@@ -328,12 +288,11 @@ export default function App() {
       ])
       .select();
 
-    if (error || !data) return alert("Failed to save to Database. Check internet/database.");
+    if (error || !data) return alert("Failed to save to Database.");
 
     const leaveId = data[0].id;
 
     const mailDraft = {
-      id: Date.now(),
       leaveId: leaveId,
       to: hrEmailAddress,
       category: leaveCategory,
@@ -342,15 +301,12 @@ export default function App() {
       reason: leaveReason || 'Personal Request',
       subject: `[LEAVE APPLICATION] - ${currentUser.name} (${leaveCategory} - ${count} Day(s))`,
       body: `Dear HR Team,\n\nI have submitted a leave request on the portal with details below:\n\n• Employee Name: ${currentUser.name} (${currentUser.employeeId})\n• Leave Type: ${leaveCategory}\n• Duration: ${dateStr} (${count} Day(s))\n• Reason: ${leaveReason || 'Personal Request'}\n\nKindly review and approve this application.\n\nBest Regards,\n${currentUser.name}\n${currentUser.role}`,
-      sentDate: new Date().toLocaleDateString(),
-      isReminderSent: false
+      sentDate: new Date().toLocaleDateString()
     };
 
     await sendRealMailToHR(mailDraft);
 
-    setEmailLogs([mailDraft, ...emailLogs]);
     setCurrentMailData(mailDraft);
-
     setSingleDate('');
     setStartDate('');
     setEndDate('');
@@ -368,33 +324,29 @@ export default function App() {
     }
   };
 
-  const handleSendReminderMail = async (emailItem) => {
+  const handleSendReminderMail = async (leaveItem) => {
     setIsSendingMail(true);
     await sendRealMailToHR({
-      ...emailItem,
-      subject: `[DAY-2 ESCALATION REMINDER] Pending Leave Approval - ${currentUser.name}`
+      leaveId: leaveItem.id,
+      to: hrEmailAddress,
+      category: leaveItem.category,
+      daysCount: leaveItem.days_count || 1,
+      dateStr: leaveItem.date_str,
+      reason: leaveItem.reason,
+      sentDate: new Date().toLocaleDateString(),
+      subject: `[DAY-2 ESCALATION REMINDER] Pending Leave Approval - ${currentUser.name}`,
+      body: `Dear HR Team,\n\nThis is a reminder for pending leave approval (#${leaveItem.id}).`
     });
-    
-    setEmailLogs(emailLogs.map(item => {
-      if (item.id === emailItem.id) {
-        return {
-          ...item,
-          isReminderSent: true,
-          reminderSubject: `[DAY-2 ESCALATION REMINDER] Pending Leave Approval - ${currentUser.name}`
-        };
-      }
-      return item;
-    }));
+
+    setReminderSentMap(prev => ({ ...prev, [leaveItem.id]: true }));
     setIsSendingMail(false);
-    alert(`Day-2 Escalation Reminder Real Email Sent to ${hrEmailAddress}!`);
+    alert(`Day-2 Escalation Reminder Email Sent to ${hrEmailAddress}!`);
   };
 
-  // Holiday Handlers
   const handleAddHoliday = (e) => {
     e.preventDefault();
     if (!holidayDate || !holidayTitle) return alert('Fill both holiday date and title');
-    const newHol = { id: Date.now(), date: holidayDate, title: holidayTitle };
-    setCompanyHolidays([...companyHolidays, newHol]);
+    setCompanyHolidays([...companyHolidays, { id: Date.now(), date: holidayDate, title: holidayTitle }]);
     setHolidayDate('');
     setHolidayTitle('');
   };
@@ -403,7 +355,7 @@ export default function App() {
     setCompanyHolidays(companyHolidays.filter(h => h.id !== id));
   };
 
-  // ---------------- HR ACTION THANK YOU RESPONSE VIEW ----------------
+  // ---------------- HR ACTION THANK YOU RESPONSE SCREEN ----------------
   if (hrActionState) {
     return (
       <div className="w-screen h-screen flex items-center justify-center bg-slate-950 p-6 font-sans">
@@ -545,7 +497,6 @@ export default function App() {
   return (
     <div className="w-screen h-screen flex bg-slate-100 overflow-hidden relative">
       
-      {/* Zoom Popup with Mail Status */}
       {showSuccessModal && currentMailData && (
         <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl p-6 max-w-lg w-full shadow-2xl border border-slate-100">
@@ -622,7 +573,7 @@ export default function App() {
         </div>
       </aside>
 
-      {/* Main Container */}
+      {/* Main Content */}
       <main className="flex-1 h-full p-8 overflow-y-auto">
         <header className="flex justify-between items-center mb-8 pb-5 border-b border-slate-200">
           <div>
@@ -671,7 +622,7 @@ export default function App() {
               </div>
             </div>
 
-            {/* Leave Records Table */}
+            {/* Leave Table */}
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
               <h3 className="text-lg font-bold text-slate-800 mb-4">Leave Application Records</h3>
               <div className="overflow-x-auto">
@@ -723,7 +674,7 @@ export default function App() {
               </div>
             </div>
 
-            {/* HR Mail Logs */}
+            {/* Dynamically Synced HR Mail Logs */}
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-bold text-slate-800">📬 HR Email Dispatcher Logs</h3>
@@ -731,32 +682,31 @@ export default function App() {
               </div>
 
               <div className="space-y-3">
-                {emailLogs.length === 0 ? (
+                {appliedLeaves.length === 0 ? (
                   <p className="text-xs text-slate-400 py-4 text-center">No HR email notifications generated yet.</p>
                 ) : (
-                  emailLogs.map(mail => {
-                    const currentLeaveRecord = appliedLeaves.find(l => l.id === mail.leaveId);
-                    const isPending = !currentLeaveRecord || currentLeaveRecord.status === 'Pending HR Approval';
+                  appliedLeaves.map(leave => {
+                    const isPending = leave.status === 'Pending HR Approval';
+                    const isReminderSent = reminderSentMap[leave.id];
 
                     return (
-                      <div key={mail.id} className="p-4 bg-slate-50 border border-slate-200 rounded-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                      <div key={leave.id} className="p-4 bg-slate-50 border border-slate-200 rounded-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                         <div>
-                          <span className="font-bold text-xs text-slate-900">{mail.subject}</span>
-                          <p className="text-xs text-slate-500 mt-1 font-mono">To: {mail.to} | Reason: {mail.reason}</p>
+                          <span className="font-bold text-xs text-slate-900">[LEAVE APPLICATION] - {currentUser.name} ({leave.category} – {leave.days_count || 1} Day(s))</span>
+                          <p className="text-xs text-slate-500 mt-1 font-mono">To: {hrEmailAddress} | Reason: {leave.reason}</p>
                         </div>
 
-                        {/* Smart Reminder Control: Auto Hides when Approved/Rejected */}
                         {isPending ? (
                           <button 
-                            onClick={() => handleSendReminderMail(mail)}
-                            disabled={mail.isReminderSent || isSendingMail}
-                            className={`px-3 py-2 rounded-xl text-xs font-bold ${mail.isReminderSent ? 'bg-slate-200 text-slate-400' : 'bg-indigo-600 hover:bg-indigo-700 text-white'}`}
+                            onClick={() => handleSendReminderMail(leave)}
+                            disabled={isReminderSent || isSendingMail}
+                            className={`px-3 py-2 rounded-xl text-xs font-bold ${isReminderSent ? 'bg-slate-200 text-slate-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-md'}`}
                           >
-                            {mail.isReminderSent ? '✓ Reminder Sent' : '🔔 Send Day-2 HR Reminder'}
+                            {isReminderSent ? '✓ Reminder Sent' : '🔔 Send Day-2 HR Reminder'}
                           </button>
                         ) : (
                           <span className="px-3 py-1.5 bg-emerald-100 text-emerald-700 font-bold rounded-xl text-xs">
-                            ✓ Action Resolved ({currentLeaveRecord.status})
+                            ✓ Action Resolved ({leave.status})
                           </span>
                         )}
                       </div>
@@ -769,7 +719,7 @@ export default function App() {
           </div>
         )}
 
-        {/* CALENDAR & LEAVE FORM TAB */}
+        {/* CALENDAR & APPLY TAB */}
         {activeTab === 'calendar' && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-4">
@@ -861,7 +811,6 @@ export default function App() {
               </form>
             </div>
 
-            {/* Holiday Calendar List */}
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-4">
               <h3 className="text-lg font-bold text-slate-800 border-b border-slate-100 pb-3">Company Holidays 2026</h3>
               
@@ -964,8 +913,6 @@ export default function App() {
                   />
                 </div>
               </div>
-
-              <p className="text-xs text-emerald-600 font-bold">✓ Settings are automatically saved to local storage.</p>
             </div>
           </div>
         )}
