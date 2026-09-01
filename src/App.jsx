@@ -6,9 +6,20 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// 🔊 Sound URLs for Status Notification Alerts
-const APPROVE_SOUND = 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3';
-const REJECT_SOUND = 'https://assets.mixkit.co/active_storage/sfx/2873/2873-preview.mp3';
+// 🔊 Direct Simple Sounds (Same as Submission Sound)
+const playSoundEffect = (type) => {
+  try {
+    let soundUrl = '';
+    if (type === 'submit') soundUrl = 'https://assets.mixkit.co/active_storage/sfx/2018/2018-preview.mp3';
+    if (type === 'Approved') soundUrl = 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3';
+    if (type === 'Rejected') soundUrl = 'https://assets.mixkit.co/active_storage/sfx/2873/2873-preview.mp3';
+
+    if (soundUrl) {
+      const audio = new Audio(soundUrl);
+      audio.play().catch(() => {});
+    }
+  } catch (e) {}
+};
 
 export default function App() {
   const [hrActionState, setHrActionState] = useState(null);
@@ -37,7 +48,6 @@ export default function App() {
   const [appliedLeaves, setAppliedLeaves] = useState([]);
   const [reminderSentMap, setReminderSentMap] = useState({});
 
-  // Prev Leave status tracker for sound playback
   const prevLeavesMapRef = useRef({});
 
   const [companyHolidays, setCompanyHolidays] = useState(() => {
@@ -81,16 +91,13 @@ export default function App() {
   };
 
   const triggerPartyPopper = () => {
-    try {
-      const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2018/2018-preview.mp3');
-      audio.play();
-    } catch (err) {}
+    playSoundEffect('submit');
     if (window.confetti) {
       window.confetti({ particleCount: 120, spread: 80, origin: { y: 0.6 } });
     }
   };
 
-  // 🔔 Fetch Leaves with Sound Detection Logic
+  // 🔔 Automatic sound trigger when HR updates status
   const fetchLeaves = async (showLoading = false) => {
     if (showLoading) setIsFetchingData(true);
     
@@ -100,19 +107,14 @@ export default function App() {
       .order('created_at', { ascending: false });
     
     if (!error && data) {
-      // Sound alert check on status updates
       data.forEach(item => {
         const prevStatus = prevLeavesMapRef.current[item.id];
         if (prevStatus && prevStatus !== item.status) {
-          if (item.status === 'Approved') {
-            new Audio(APPROVE_SOUND).play().catch(e => console.log("Audio blocked:", e));
-          } else if (item.status === 'Rejected') {
-            new Audio(REJECT_SOUND).play().catch(e => console.log("Audio blocked:", e));
-          }
+          if (item.status === 'Approved') playSoundEffect('Approved');
+          if (item.status === 'Rejected') playSoundEffect('Rejected');
         }
       });
 
-      // Update tracked status map
       const newMap = {};
       data.forEach(item => {
         newMap[item.id] = item.status;
@@ -129,7 +131,6 @@ export default function App() {
     }
   };
 
-  // HR Action Handling from Email Link
   useEffect(() => {
     const handleUrlAction = async () => {
       const urlParams = new URLSearchParams(window.location.search);
@@ -148,7 +149,6 @@ export default function App() {
           .maybeSingle();
 
         if (fetchErr || !existingLeave) {
-          console.error("Fetch Error:", fetchErr);
           setHrActionState('error');
           return;
         }
@@ -168,7 +168,6 @@ export default function App() {
           setHrActionState('success');
           setHrActionDetails({ status: targetStatus, leaveId });
         } else {
-          console.error("Update Error:", updateErr);
           setHrActionState('error');
         }
       }
@@ -183,7 +182,7 @@ export default function App() {
 
       const pollInterval = setInterval(() => {
         fetchLeaves(false);
-      }, 10000);
+      }, 5000);
 
       const channel = supabase
         .channel('schema-db-changes')
@@ -296,13 +295,14 @@ export default function App() {
     setActiveTab('dashboard');
   };
 
-  // 🔴 Mandatory Reason Validation Check
+  // 🛑 Strict Reason Validation Check (Stops Form Execution Immediately)
   const handleApplyLeave = async (e) => {
     e.preventDefault();
 
-    if (!leaveReason || leaveReason.trim() === '') {
-      alert("Kripya leave ka reason darj karein! / Reason is required.");
-      return;
+    const formattedReason = leaveReason ? leaveReason.trim() : '';
+    if (!formattedReason) {
+      alert("⚠️ Reason likhna zaroori hai! (Leave reason is mandatory)");
+      return; // STOP! Email ya DB update bilkul nahi hoga
     }
 
     let count = 1;
@@ -336,7 +336,7 @@ export default function App() {
           category: leaveCategory,
           date_str: dateStr,
           days_count: count,
-          reason: leaveReason.trim(),
+          reason: formattedReason,
           status: 'Pending HR Approval'
         }
       ])
@@ -352,9 +352,9 @@ export default function App() {
       category: leaveCategory,
       daysCount: count,
       dateStr,
-      reason: leaveReason.trim(),
+      reason: formattedReason,
       subject: `[LEAVE APPLICATION] - ${currentUser.name} (${leaveCategory} - ${count} Day(s))`,
-      body: `Dear HR Team,\n\nI have submitted a leave request on the portal with details below:\n\n• Employee Name: ${currentUser.name} (${currentUser.employeeId})\n• Leave Type: ${leaveCategory}\n• Duration: ${dateStr} (${count} Day(s))\n• Reason: ${leaveReason.trim()}\n\nKindly review and approve this application.\n\nBest Regards,\n${currentUser.name}\n${currentUser.role}`,
+      body: `Dear HR Team,\n\nI have submitted a leave request on the portal with details below:\n\n• Employee Name: ${currentUser.name} (${currentUser.employeeId})\n• Leave Type: ${leaveCategory}\n• Duration: ${dateStr} (${count} Day(s))\n• Reason: ${formattedReason}\n\nKindly review and approve this application.\n\nBest Regards,\n${currentUser.name}\n${currentUser.role}`,
       sentDate: new Date().toLocaleDateString()
     };
 
@@ -714,7 +714,7 @@ export default function App() {
                           </td>
                           <td className="py-3.5 px-4 font-semibold text-slate-800">{item.date_str || item.dateStr}</td>
                           <td className="py-3.5 px-4 font-semibold text-slate-600">{item.days_count || item.daysCount} Day(s)</td>
-                          <td className="py-3.5 px-4 text-slate-500">{item.reason}</td>
+                          <td className="py-3.5 px-4 text-slate-500 font-medium">{item.reason}</td>
                           <td className="py-3.5 px-4">
                             <span className={`px-3 py-1 rounded-full text-xs font-bold ${item.status === 'Approved' ? 'bg-emerald-100 text-emerald-800' : item.status === 'Rejected' ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800'}`}>
                               {item.status}
@@ -827,11 +827,13 @@ export default function App() {
                 )}
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase mb-2">Reason for Leave <span className="text-rose-600">*</span></label>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-2">
+                    Reason for Leave <span className="text-rose-600 font-bold">* Mandatory</span>
+                  </label>
                   <textarea 
                     rows="3"
                     required
-                    placeholder="Enter explicit reason for leave request..."
+                    placeholder="Enter reason for leave request..."
                     value={leaveReason}
                     onChange={e => setLeaveReason(e.target.value)}
                     className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 font-semibold text-sm focus:outline-none focus:ring-2 focus:ring-indigo-600"
