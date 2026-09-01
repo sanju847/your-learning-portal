@@ -30,7 +30,7 @@ export default function App() {
   const [loginError, setLoginError] = useState('');
   const [activeTab, setActiveTab] = useState('dashboard');
 
-  // Quota & Carry Forward States (Database synced with fallback)
+  // Quota & Carry Forward States (Database synced)
   const [clQuota, setClQuota] = useState(12);
   const [slQuota, setSlQuota] = useState(6);
   const [sabbaticalQuota, setSabbaticalQuota] = useState(30);
@@ -104,7 +104,7 @@ export default function App() {
     }
   };
 
-  // Fetch Portal Settings from Supabase DB to ensure mobile & desktop sync
+  // Supabase Portal Settings Fetch
   const fetchPortalSettings = async () => {
     const { data, error } = await supabase.from('settings').select('*').eq('id', 1).maybeSingle();
     if (!error && data) {
@@ -116,7 +116,7 @@ export default function App() {
     }
   };
 
-  // Update Settings in Database
+  // Supabase Portal Settings Save
   const saveSettingsToDB = async (updatedObj) => {
     const payload = {
       id: 1,
@@ -162,6 +162,7 @@ export default function App() {
     }
   };
 
+  // EMAIL APPROVAL / REJECTION URL HANDLER WITH SINGLE-ACTION LOCK
   useEffect(() => {
     const handleUrlAction = async () => {
       const urlParams = new URLSearchParams(window.location.search);
@@ -173,6 +174,7 @@ export default function App() {
         const targetStatus = action === 'approve' ? 'Approved' : 'Rejected';
         const leaveId = Number(rawLeaveId);
 
+        // Fetch current status from DB first
         const { data: existingLeave, error: fetchErr } = await supabase
           .from('leaves')
           .select('status')
@@ -184,12 +186,14 @@ export default function App() {
           return;
         }
 
+        // Prevent second action if already processed by HR or Owner
         if (existingLeave.status !== 'Pending HR Approval') {
           setHrActionState('already_done');
           setHrActionDetails({ status: existingLeave.status, leaveId });
           return;
         }
 
+        // Update status if it was pending
         const { error: updateErr } = await supabase
           .from('leaves')
           .update({ status: targetStatus })
@@ -456,6 +460,7 @@ export default function App() {
     setCompanyHolidays(companyHolidays.filter(h => h.id !== id));
   };
 
+  // ACTION SCREENS (HR / OWNER RESPONSE)
   if (hrActionState) {
     return (
       <div className="min-h-screen w-full flex items-center justify-center bg-slate-950 p-4 font-sans">
@@ -463,7 +468,7 @@ export default function App() {
           {hrActionState === 'processing' && (
             <div className="py-8">
               <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-              <p className="text-slate-300 font-bold text-sm">Processing HR response...</p>
+              <p className="text-slate-300 font-bold text-sm">Processing response...</p>
             </div>
           )}
 
@@ -472,7 +477,7 @@ export default function App() {
               <div className="w-16 h-16 bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 rounded-full flex items-center justify-center text-3xl mx-auto font-black shadow-inner">
                 ✓
               </div>
-              <h2 className="text-2xl font-black text-white">Thank You, HR!</h2>
+              <h2 className="text-2xl font-black text-white">Thank You!</h2>
               <p className="text-sm text-slate-300 font-medium">
                 Leave Request <span className="font-mono font-bold text-white">#{hrActionDetails.leaveId}</span> has been marked as{' '}
                 <span className={`font-bold ${hrActionDetails.status === 'Approved' ? 'text-emerald-400' : 'text-rose-400'}`}>
@@ -508,24 +513,11 @@ export default function App() {
     );
   }
 
-  // --- LOGIN VIEW ---
+  // LOGIN VIEW
   if (!isLoggedIn) {
     return (
       <div className="min-h-screen w-full flex items-center justify-center bg-[#05060f] p-4 relative overflow-hidden select-none">
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[600px] bg-gradient-to-tr from-indigo-900/40 via-purple-900/30 to-blue-900/20 rounded-full blur-[160px] pointer-events-none"></div>
-
-        <div 
-          className="absolute inset-0 opacity-25 pointer-events-none"
-          style={{
-            backgroundImage: `radial-gradient(circle at 50% 50%, rgba(99, 102, 241, 0.15) 1px, transparent 1px)`,
-            backgroundSize: '40px 40px',
-            transform: 'perspective(500px) rotateX(60deg) translateY(100px)',
-            transformOrigin: 'bottom center'
-          }}
-        ></div>
-
-        <div className="absolute left-10 top-1/4 w-32 h-32 bg-purple-600/30 rounded-full blur-2xl"></div>
-        <div className="absolute right-12 bottom-1/4 w-40 h-40 bg-cyan-500/30 rounded-full blur-2xl"></div>
 
         <div className="w-full max-w-4xl bg-[#0e1322]/90 backdrop-blur-xl rounded-3xl shadow-[0_30px_90px_rgba(0,0,0,0.8)] border border-white/10 overflow-hidden flex flex-col md:flex-row relative z-10">
           <div className="w-full md:w-1/2 relative flex flex-col justify-between p-6 md:p-10 text-white overflow-hidden min-h-[300px] md:min-h-[460px]">
@@ -606,6 +598,7 @@ export default function App() {
     );
   }
 
+  // MAIN SYSTEM APP
   return (
     <div className="min-h-screen w-full flex flex-col md:flex-row bg-slate-100 font-sans overflow-x-hidden">
       {showSuccessModal && currentMailData && (
@@ -617,12 +610,12 @@ export default function App() {
               </div>
               <div className="text-left">
                 <h3 className="text-base md:text-lg font-extrabold text-slate-900">Leave Submitted & Email Dispatched</h3>
-                <p className="text-xs text-slate-500 font-semibold">Real email notification sent to HR ({currentMailData.to})</p>
+                <p className="text-xs text-slate-500 font-semibold">Real email notification sent to ({currentMailData.to})</p>
               </div>
             </div>
 
             <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 text-left font-mono text-xs text-slate-700 space-y-2 max-h-56 overflow-y-auto">
-              <p><strong>To HR Email:</strong> {currentMailData.to}</p>
+              <p><strong>To:</strong> {currentMailData.to}</p>
               <p><strong>Subject:</strong> {currentMailData.subject}</p>
               <p><strong>Reason:</strong> {currentMailData.reason}</p>
             </div>
@@ -639,7 +632,7 @@ export default function App() {
         </div>
       )}
 
-      {/* Navigation Sidebar */}
+      {/* Sidebar Navigation */}
       <aside className="w-full md:w-64 bg-slate-950 text-slate-300 flex flex-col justify-between shrink-0 border-r border-slate-800">
         <div>
           <div className="p-4 border-b border-slate-800 flex items-center justify-between gap-3">
@@ -691,7 +684,7 @@ export default function App() {
         </div>
       </aside>
 
-      {/* Main Panel View */}
+      {/* Main View Area */}
       <main className="flex-1 w-full max-w-full p-4 md:p-8 overflow-y-auto min-w-0">
         <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-6 pb-4 border-b border-slate-200">
           <div>
@@ -926,7 +919,7 @@ export default function App() {
                   disabled={isSendingMail}
                   className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold rounded-xl shadow-lg transition border border-white/20 text-sm"
                 >
-                  {isSendingMail ? 'Sending Mail to HR...' : 'Submit Leave Request & Send Email'}
+                  {isSendingMail ? 'Sending Mail...' : 'Submit Leave Request & Send Email'}
                 </button>
               </form>
             </div>
@@ -980,14 +973,17 @@ export default function App() {
 
             <div className="space-y-5">
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">HR Email Address</label>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                  Recipient Email Addresses (Use commas for multiple, e.g. HR, Owner)
+                </label>
                 <input 
-                  type="email" 
+                  type="text" 
                   value={hrEmailAddress}
                   onChange={e => {
                     setHrEmailAddress(e.target.value);
                     saveSettingsToDB({ hrEmail: e.target.value });
                   }}
+                  placeholder="sanju@yourlearnings.com, owner@yourlearnings.com"
                   className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 font-semibold text-sm focus:outline-none focus:ring-2 focus:ring-indigo-600"
                 />
               </div>
