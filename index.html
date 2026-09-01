@@ -1,34 +1,197 @@
 <!DOCTYPE html>
-<html lang="en" style="height: 100%; width: 100%; margin: 0; padding: 0;">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Your Learning Portal</title>
-    
-    <!-- External Libraries -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
-    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
-    
-    <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    
-    <!-- Custom Styles -->
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Attendance & Leave Portal</title>
     <style>
-      * { margin: 0; padding: 0; box-sizing: border-box; }
-      html, body, #root {
-        height: 100% !important;
-        width: 100% !important;
-        font-family: 'Plus Jakarta Sans', sans-serif;
-        overflow-x: hidden;
-      }
-      .bg-slide {
-        transition: opacity 1.2s ease-in-out, transform 10s ease-out;
-      }
+        * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background-color: #f4f7f6; margin: 0; padding: 20px; color: #333; }
+        
+        .container { display: flex; gap: 20px; max-width: 1200px; margin: 0 auto; }
+        .card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        
+        .left-panel { flex: 1; }
+        .right-panel { flex: 2; }
+
+        h3 { margin-top: 0; color: #111827; font-size: 18px; border-bottom: 2px solid #f3f4f6; padding-bottom: 10px; }
+        
+        .form-group { margin-bottom: 15px; }
+        label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 5px; color: #4b5563; }
+        input, select, button { width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; }
+        
+        .btn-submit { background: #0284c7; color: white; border: none; font-weight: 600; cursor: pointer; transition: 0.2s; }
+        .btn-submit:hover { background: #0369a1; }
+
+        /* Calendar Grid */
+        .calendar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; }
+        .day-header { font-weight: bold; text-align: center; color: #6b7280; font-size: 12px; padding: 5px; }
+        .day-cell { height: 60px; border: 1px solid #e5e7eb; border-radius: 6px; padding: 5px; font-size: 12px; font-weight: 600; position: relative; background: #fff; }
+        .today { border: 2px solid #0284c7; }
+
+        /* Dynamic Colors */
+        .leave-planned { background-color: #fef08a !important; border-color: #facc15; color: #854d0e; } /* Yellow */
+        .leave-casual { background-color: #fed7aa !important; border-color: #fb923c; color: #9a3412; }  /* Orange */
+        .leave-sick { background-color: #fca5a5 !important; border-color: #f87171; color: #991b1b; }    /* Red */
+        
+        .leave-label { font-size: 9px; text-transform: uppercase; display: block; margin-top: 4px; font-weight: 700; }
+
+        /* Delete / Action List */
+        .leave-list { margin-top: 15px; max-height: 200px; overflow-y: auto; }
+        .leave-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 6px; margin-bottom: 8px; font-size: 13px; }
+        .btn-delete { background: #ef4444; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 11px; width: auto; }
+        .btn-delete:hover { background: #dc2626; }
     </style>
-  </head>
-  <body class="bg-slate-100 text-slate-800">
-    <div id="root" class="w-full h-full"></div>
-    <script type="module" src="/src/main.jsx"></script>
-  </body>
+</head>
+<body>
+
+<div class="container">
+    <div class="left-panel">
+        <!-- Leave Form -->
+        <div class="card">
+            <h3>Apply Leave</h3>
+            <form id="leaveForm">
+                <div class="form-group">
+                    <label>Select Date</label>
+                    <input type="date" id="leaveDate" required>
+                </div>
+                <div class="form-group">
+                    <label>Leave Type</label>
+                    <select id="leaveType">
+                        <option value="planned">Planned Leave (Yellow)</option>
+                        <option value="casual">Casual Leave (Orange)</option>
+                        <option value="sick">Sick Leave (Red)</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn-submit">Apply Leave</button>
+            </form>
+        </div>
+
+        <!-- Applied Leaves List with Delete Option -->
+        <div class="card" style="margin-top: 20px;">
+            <h3>Active Leaves Log</h3>
+            <div id="leaveList" class="leave-list">
+                <div style="color: #9ca3af; font-size: 12px;">No active leaves applied.</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Calendar Panel -->
+    <div class="right-panel">
+        <div class="card">
+            <div class="calendar-header">
+                <h3 id="monthYearTitle" style="border:none; margin:0;">September 2026</h3>
+            </div>
+            <div class="calendar-grid" id="calendarGrid"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const leaveData = {}; 
+
+    // Current System Date (Dynamic)
+    const today = new Date();
+    const currentYear = today.getFullYear();
+    const currentMonth = today.getMonth();
+
+    // Restrict date input to current day onwards
+    document.getElementById('leaveDate').min = today.toISOString().split('T')[0];
+
+    function renderCalendar() {
+        const calendarGrid = document.getElementById('calendarGrid');
+        const monthYearTitle = document.getElementById('monthYearTitle');
+        
+        calendarGrid.innerHTML = '';
+        
+        const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+        monthYearTitle.innerText = `${monthNames[currentMonth]} ${currentYear}`;
+
+        const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        days.forEach(day => {
+            const header = document.createElement('div');
+            header.className = 'day-header';
+            header.innerText = day;
+            calendarGrid.appendChild(header);
+        });
+
+        const firstDayIndex = new Date(currentYear, currentMonth, 1).getDay();
+        const totalDays = new Date(currentYear, currentMonth + 1, 0).getDate();
+
+        for (let i = 0; i < firstDayIndex; i++) {
+            const emptyCell = document.createElement('div');
+            calendarGrid.appendChild(emptyCell);
+        }
+
+        for (let day = 1; day <= totalDays; day++) {
+            const dayCell = document.createElement('div');
+            dayCell.className = 'day-cell';
+            dayCell.innerHTML = `<span>${day}</span>`;
+
+            const formattedMonth = String(currentMonth + 1).padStart(2, '0');
+            const formattedDay = String(day).padStart(2, '0');
+            const dateKey = `${currentYear}-${formattedMonth}-${formattedDay}`;
+
+            if (day === today.getDate() && currentMonth === today.getMonth() && currentYear === today.getFullYear()) {
+                dayCell.classList.add('today');
+            }
+
+            if (leaveData[dateKey]) {
+                const leaveType = leaveData[dateKey];
+                dayCell.classList.add(`leave-${leaveType}`);
+                dayCell.innerHTML += `<span class="leave-label">${leaveType}</span>`;
+            }
+
+            calendarGrid.appendChild(dayCell);
+        }
+
+        renderLeaveList();
+    }
+
+    function renderLeaveList() {
+        const leaveListContainer = document.getElementById('leaveList');
+        leaveListContainer.innerHTML = '';
+
+        const entries = Object.entries(leaveData);
+        if (entries.length === 0) {
+            leaveListContainer.innerHTML = '<div style="color: #9ca3af; font-size: 12px;">No active leaves applied.</div>';
+            return;
+        }
+
+        entries.forEach(([date, type]) => {
+            const item = document.createElement('div');
+            item.className = 'leave-item';
+            item.innerHTML = `
+                <div>
+                    <strong>${date}</strong> - <span style="text-transform: capitalize;">${type}</span>
+                </div>
+                <button class="btn-delete" onclick="deleteLeave('${date}')">Delete</button>
+            `;
+            leaveListContainer.appendChild(item);
+        });
+    }
+
+    // Delete Leave Function
+    function deleteLeave(dateKey) {
+        delete leaveData[dateKey];
+        renderCalendar();
+    }
+
+    document.getElementById('leaveForm').addEventListener('submit', function (e) {
+        e.preventDefault();
+        
+        const selectedDate = document.getElementById('leaveDate').value;
+        const selectedType = document.getElementById('leaveType').value;
+
+        if (selectedDate) {
+            leaveData[selectedDate] = selectedType;
+            renderCalendar();
+            this.reset();
+        }
+    });
+
+    renderCalendar();
+</script>
+</body>
 </html>
