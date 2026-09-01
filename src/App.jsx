@@ -88,6 +88,18 @@ export default function App() {
     role: `Operations Lead (${isSabbaticalEligible ? '3+ Yrs Tenure' : 'Under 3 Yrs Tenure'})`
   };
 
+  // Sound & Confetti Effect
+  const triggerPartyPopper = () => {
+    try {
+      const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2018/2018-preview.mp3');
+      audio.play();
+    } catch (err) {}
+
+    if (window.confetti) {
+      window.confetti({ particleCount: 120, spread: 80, origin: { y: 0.6 } });
+    }
+  };
+
   // Database Fetch Function
   const fetchLeaves = async () => {
     const { data, error } = await supabase
@@ -115,6 +127,40 @@ export default function App() {
       supabase.removeChannel(channel);
     };
   }, [isLoggedIn]);
+
+  // Check URL parameters for HR Email Approval/Rejection action
+  useEffect(() => {
+    const handleUrlAction = async () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const action = urlParams.get('action');
+      const leaveId = urlParams.get('id');
+
+      if (action && leaveId) {
+        const newStatus = action === 'approve' ? 'Approved' : 'Rejected';
+        
+        // Update status directly in Supabase Database
+        const { error } = await supabase
+          .from('leaves')
+          .update({ status: newStatus })
+          .eq('id', leaveId);
+
+        if (!error) {
+          alert(`Leave ID #${leaveId} has been successfully ${newStatus}!`);
+          if (newStatus === 'Approved') {
+            triggerPartyPopper();
+          }
+          fetchLeaves();
+        } else {
+          alert("Failed to update leave status.");
+        }
+
+        // Clean URL after processing
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+    };
+
+    handleUrlAction();
+  }, []);
 
   // Login Background Images
   const bgImages = [
@@ -164,13 +210,13 @@ export default function App() {
   const remainingSL = slQuota - usedSL;
   const remainingSabbatical = sabbaticalQuota - usedSabbatical;
 
-  // Direct Supabase API links for Email approval buttons
+  // Direct Vercel Web Approval links for EmailJS
   const sendRealMailToHR = async (mailPayload) => {
     setIsSendingMail(true);
     
     if (window.emailjs) {
       try {
-        const approveUrl = `${SUPABASE_URL}/rest/v1/leaves?id=eq.${mailPayload.leaveId}`;
+        const approveUrl = `https://your-learning-portal.vercel.app/?action=approve&id=${mailPayload.leaveId}`;
         
         await window.emailjs.send(
           'service_ts2aotz',   // Service ID
@@ -218,17 +264,6 @@ export default function App() {
     setIsLoggedIn(false);
     localStorage.setItem('ylp_isLoggedIn', 'false');
     setActiveTab('dashboard');
-  };
-
-  const triggerPartyPopper = () => {
-    try {
-      const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2018/2018-preview.mp3');
-      audio.play();
-    } catch (err) {}
-
-    if (window.confetti) {
-      window.confetti({ particleCount: 120, spread: 80, origin: { y: 0.6 } });
-    }
   };
 
   // Apply Leave Handler
@@ -333,6 +368,20 @@ export default function App() {
     }));
     setIsSendingMail(false);
     alert(`Day-2 Escalation Reminder Real Email Sent to ${hrEmailAddress}!`);
+  };
+
+  // Holiday Add/Delete Handlers
+  const handleAddHoliday = (e) => {
+    e.preventDefault();
+    if (!holidayDate || !holidayTitle) return alert('Fill both holiday date and title');
+    const newHol = { id: Date.now(), date: holidayDate, title: holidayTitle };
+    setCompanyHolidays([...companyHolidays, newHol]);
+    setHolidayDate('');
+    setHolidayTitle('');
+  };
+
+  const handleDeleteHoliday = (id) => {
+    setCompanyHolidays(companyHolidays.filter(h => h.id !== id));
   };
 
   // ---------------- LOGIN PAGE ----------------
@@ -675,89 +724,161 @@ export default function App() {
                       <input type="radio" checked={dateMode === 'single'} onChange={() => setDateMode('single')} /> Single Day
                     </label>
                     <label className="flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer">
-                      <input type="radio" checked={dateMode === 'range'} onChange={() => setDateMode('range')} /> Multi Day Range
+                      <input type="radio" checked={dateMode === 'range'} onChange={() => setDateMode('range')} /> Date Range
                     </label>
                   </div>
 
                   {dateMode === 'single' ? (
                     <input 
                       type="date" 
-                      required 
                       value={singleDate} 
                       onChange={e => setSingleDate(e.target.value)} 
-                      className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold"
+                      className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-semibold"
                     />
                   ) : (
                     <div className="grid grid-cols-2 gap-3">
                       <input 
                         type="date" 
-                        required 
                         value={startDate} 
                         onChange={e => setStartDate(e.target.value)} 
-                        className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold"
+                        className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-semibold"
                       />
                       <input 
                         type="date" 
-                        required 
                         value={endDate} 
                         onChange={e => setEndDate(e.target.value)} 
-                        className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold"
+                        className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-semibold"
                       />
                     </div>
                   )}
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase mb-2">Reason for Leave</label>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-2">Reason</label>
                   <textarea 
-                    rows="3" 
-                    placeholder="Provide details for HR review..." 
-                    value={leaveReason} 
+                    rows="3"
+                    placeholder="Enter reason for leave..."
+                    value={leaveReason}
                     onChange={e => setLeaveReason(e.target.value)}
-                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-600"
-                  ></textarea>
+                    className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-semibold"
+                  />
                 </div>
 
                 <button 
                   type="submit" 
                   disabled={isSendingMail}
-                  className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl shadow-md text-sm transition"
+                  className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl shadow-lg transition text-sm"
                 >
-                  {isSendingMail ? 'Sending Email to HR...' : 'Submit Application & Notify HR'}
+                  {isSendingMail ? 'Sending Email to HR...' : 'Apply Leave & Send HR Email'}
                 </button>
               </form>
             </div>
 
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-              <h3 className="text-lg font-bold text-slate-800 mb-4">Company Holidays (2026)</h3>
-              <div className="space-y-3">
-                {companyHolidays.map(h => (
-                  <div key={h.id} className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl flex justify-between items-center">
+            {/* Holiday Calendar List */}
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-4">
+              <h3 className="text-lg font-bold text-slate-800 border-b border-slate-100 pb-3">Company Holidays 2026</h3>
+              
+              <div className="space-y-3 max-h-80 overflow-y-auto">
+                {companyHolidays.map(hol => (
+                  <div key={hol.id} className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex justify-between items-center">
                     <div>
-                      <p className="font-bold text-slate-900 text-sm">{h.title}</p>
-                      <p className="text-xs text-slate-500 font-mono mt-0.5">{h.date}</p>
+                      <p className="font-bold text-sm text-slate-800">{hol.title}</p>
+                      <p className="text-xs text-slate-500 font-mono">{hol.date}</p>
                     </div>
-                    <span className="text-xs font-bold bg-indigo-50 text-indigo-700 px-3 py-1 rounded-full">Official</span>
+                    <button 
+                      onClick={() => handleDeleteHoliday(hol.id)}
+                      className="text-xs text-red-500 hover:text-red-700 font-bold px-2 py-1"
+                    >
+                      ✕
+                    </button>
                   </div>
                 ))}
               </div>
+
+              <form onSubmit={handleAddHoliday} className="pt-4 border-t border-slate-100 space-y-3">
+                <p className="text-xs font-bold text-slate-700 uppercase">Add Custom Holiday</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <input 
+                    type="date" 
+                    value={holidayDate} 
+                    onChange={e => setHolidayDate(e.target.value)} 
+                    className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold"
+                  />
+                  <input 
+                    type="text" 
+                    placeholder="Holiday Name" 
+                    value={holidayTitle} 
+                    onChange={e => setHolidayTitle(e.target.value)} 
+                    className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold"
+                  />
+                </div>
+                <button type="submit" className="w-full py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold">
+                  + Add Holiday
+                </button>
+              </form>
             </div>
           </div>
         )}
 
         {/* SETTINGS TAB */}
         {activeTab === 'settings' && (
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 max-w-xl">
-            <h3 className="text-lg font-bold text-slate-800 mb-4">HR & Email Integration Settings</h3>
-            <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase mb-2">HR Email Address</label>
-              <input 
-                type="email" 
-                value={hrEmailAddress} 
-                onChange={e => setHrEmailAddress(e.target.value)} 
-                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold"
-              />
-              <p className="text-xs text-slate-400 mt-2">All leave requests & reminder emails will be dispatched to this email address via EmailJS.</p>
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 max-w-2xl space-y-6">
+            <h3 className="text-lg font-bold text-slate-800 border-b border-slate-100 pb-3">Quota & HR Email Configuration</h3>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-2">Target HR Email Address</label>
+                <input 
+                  type="email" 
+                  value={hrEmailAddress}
+                  onChange={e => setHrEmailAddress(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-semibold"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-2">CL Quota</label>
+                  <input 
+                    type="number" 
+                    value={clQuota}
+                    onChange={e => setClQuota(Number(e.target.value))}
+                    className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-semibold"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-2">CL Carry Forward</label>
+                  <input 
+                    type="number" 
+                    value={clCarryForward}
+                    onChange={e => setClCarryForward(Number(e.target.value))}
+                    className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-semibold"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-2">SL Quota</label>
+                  <input 
+                    type="number" 
+                    value={slQuota}
+                    onChange={e => setSlQuota(Number(e.target.value))}
+                    className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-semibold"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-2">Sabbatical Quota</label>
+                  <input 
+                    type="number" 
+                    value={sabbaticalQuota}
+                    onChange={e => setSabbaticalQuota(Number(e.target.value))}
+                    className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-semibold"
+                  />
+                </div>
+              </div>
+
+              <p className="text-xs text-emerald-600 font-bold">✓ Settings are automatically saved to local storage.</p>
             </div>
           </div>
         )}
