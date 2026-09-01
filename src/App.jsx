@@ -7,6 +7,10 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 export default function App() {
+  // Action Handled view for HR Email Click
+  const [hrActionState, setHrActionState] = useState(null); // null, 'processing', 'success', 'already_done', 'error'
+  const [hrActionDetails, setHrActionDetails] = useState({ status: '', leaveId: '' });
+
   // Authentication State
   const [isLoggedIn, setIsLoggedIn] = useState(() => {
     return localStorage.getItem('ylp_isLoggedIn') === 'true';
@@ -112,10 +116,57 @@ export default function App() {
     }
   };
 
+  // Check URL parameters for HR Email Approval/Rejection action
+  useEffect(() => {
+    const handleUrlAction = async () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const action = urlParams.get('action');
+      const leaveId = urlParams.get('id');
+
+      if (action && leaveId) {
+        setHrActionState('processing');
+        const targetStatus = action === 'approve' ? 'Approved' : 'Rejected';
+
+        // Check if leave already processed
+        const { data: existingLeave, error: fetchErr } = await supabase
+          .from('leaves')
+          .select('status')
+          .eq('id', leaveId)
+          .single();
+
+        if (fetchErr || !existingLeave) {
+          setHrActionState('error');
+          return;
+        }
+
+        if (existingLeave.status !== 'Pending HR Approval') {
+          setHrActionState('already_done');
+          setHrActionDetails({ status: existingLeave.status, leaveId });
+          return;
+        }
+
+        // Perform status update
+        const { error: updateErr } = await supabase
+          .from('leaves')
+          .update({ status: targetStatus })
+          .eq('id', leaveId);
+
+        if (!updateErr) {
+          setHrActionState('success');
+          setHrActionDetails({ status: targetStatus, leaveId });
+        } else {
+          setHrActionState('error');
+        }
+      }
+    };
+
+    handleUrlAction();
+  }, []);
+
   useEffect(() => {
     fetchLeaves();
 
-    // Setup Supabase Realtime Subscription for Background Status Updates
+    // Realtime Sync for Auto Status Update & Hiding Reminder Buttons
     const channel = supabase
       .channel('schema-db-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'leaves' }, () => {
@@ -127,40 +178,6 @@ export default function App() {
       supabase.removeChannel(channel);
     };
   }, [isLoggedIn]);
-
-  // Check URL parameters for HR Email Approval/Rejection action
-  useEffect(() => {
-    const handleUrlAction = async () => {
-      const urlParams = new URLSearchParams(window.location.search);
-      const action = urlParams.get('action');
-      const leaveId = urlParams.get('id');
-
-      if (action && leaveId) {
-        const newStatus = action === 'approve' ? 'Approved' : 'Rejected';
-        
-        // Update status directly in Supabase Database
-        const { error } = await supabase
-          .from('leaves')
-          .update({ status: newStatus })
-          .eq('id', leaveId);
-
-        if (!error) {
-          alert(`Leave ID #${leaveId} has been successfully ${newStatus}!`);
-          if (newStatus === 'Approved') {
-            triggerPartyPopper();
-          }
-          fetchLeaves();
-        } else {
-          alert("Failed to update leave status.");
-        }
-
-        // Clean URL after processing
-        window.history.replaceState({}, document.title, window.location.pathname);
-      }
-    };
-
-    handleUrlAction();
-  }, []);
 
   // Login Background Images
   const bgImages = [
@@ -217,10 +234,11 @@ export default function App() {
     if (window.emailjs) {
       try {
         const approveUrl = `https://your-learning-portal.vercel.app/?action=approve&id=${mailPayload.leaveId}`;
+        const rejectUrl = `https://your-learning-portal.vercel.app/?action=reject&id=${mailPayload.leaveId}`;
         
         await window.emailjs.send(
-          'service_ts2aotz',   // Service ID
-          'template_odlpu7u',  // Template ID
+          'service_ts2aotz',
+          'template_odlpu7u',
           {
             to_email: hrEmailAddress,
             hr_email: hrEmailAddress,
@@ -234,9 +252,10 @@ export default function App() {
             subject: mailPayload.subject,
             message: mailPayload.body,
             leave_id: mailPayload.leaveId,
-            approve_link: approveUrl
+            approve_link: approveUrl,
+            reject_link: rejectUrl
           },
-          'O5FhcUXl6UTLrRv7n'    // Public Key
+          'O5FhcUXl6UTLrRv7n'
         );
       } catch (err) {
         console.error("EmailJS sending error:", err);
@@ -370,7 +389,7 @@ export default function App() {
     alert(`Day-2 Escalation Reminder Real Email Sent to ${hrEmailAddress}!`);
   };
 
-  // Holiday Add/Delete Handlers
+  // Holiday Handlers
   const handleAddHoliday = (e) => {
     e.preventDefault();
     if (!holidayDate || !holidayTitle) return alert('Fill both holiday date and title');
@@ -383,6 +402,62 @@ export default function App() {
   const handleDeleteHoliday = (id) => {
     setCompanyHolidays(companyHolidays.filter(h => h.id !== id));
   };
+
+  // ---------------- HR ACTION THANK YOU RESPONSE VIEW ----------------
+  if (hrActionState) {
+    return (
+      <div className="w-screen h-screen flex items-center justify-center bg-slate-950 p-6 font-sans">
+        <div className="max-w-md w-full bg-white rounded-3xl p-8 text-center shadow-2xl border border-slate-800">
+          {hrActionState === 'processing' && (
+            <div className="py-8">
+              <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+              <p className="text-slate-600 font-bold text-sm">Processing HR response...</p>
+            </div>
+          )}
+
+          {hrActionState === 'success' && (
+            <div className="space-y-4">
+              <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center text-3xl mx-auto font-black shadow-inner">
+                ✓
+              </div>
+              <h2 className="text-2xl font-black text-slate-900">Thank You, HR!</h2>
+              <p className="text-sm text-slate-600 font-medium">
+                Leave Request <span className="font-mono font-bold text-slate-900">#{hrActionDetails.leaveId}</span> has been marked as{' '}
+                <span className={`font-bold ${hrActionDetails.status === 'Approved' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                  {hrActionDetails.status}
+                </span>.
+              </p>
+              <p className="text-xs text-slate-400">Employee dashboard status has been updated automatically.</p>
+            </div>
+          )}
+
+          {hrActionState === 'already_done' && (
+            <div className="space-y-4">
+              <div className="w-16 h-16 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center text-3xl mx-auto font-black">
+                🔒
+              </div>
+              <h2 className="text-xl font-bold text-slate-900">Action Already Processed</h2>
+              <p className="text-sm text-slate-600 font-medium">
+                This leave request (# {hrActionDetails.leaveId}) was already recorded as{' '}
+                <span className="font-bold text-slate-900">{hrActionDetails.status}</span>.
+              </p>
+              <p className="text-xs text-slate-400">No further modifications can be made from this email link.</p>
+            </div>
+          )}
+
+          {hrActionState === 'error' && (
+            <div className="space-y-4">
+              <div className="w-16 h-16 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center text-3xl mx-auto font-black">
+                ⚠️
+              </div>
+              <h2 className="text-xl font-bold text-slate-900">Action Failed</h2>
+              <p className="text-sm text-slate-500 font-medium">Unable to update leave request status or invalid link ID.</p>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   // ---------------- LOGIN PAGE ----------------
   if (!isLoggedIn) {
@@ -659,22 +734,34 @@ export default function App() {
                 {emailLogs.length === 0 ? (
                   <p className="text-xs text-slate-400 py-4 text-center">No HR email notifications generated yet.</p>
                 ) : (
-                  emailLogs.map(mail => (
-                    <div key={mail.id} className="p-4 bg-slate-50 border border-slate-200 rounded-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                      <div>
-                        <span className="font-bold text-xs text-slate-900">{mail.subject}</span>
-                        <p className="text-xs text-slate-500 mt-1 font-mono">To: {mail.to} | Reason: {mail.reason}</p>
-                      </div>
+                  emailLogs.map(mail => {
+                    const currentLeaveRecord = appliedLeaves.find(l => l.id === mail.leaveId);
+                    const isPending = !currentLeaveRecord || currentLeaveRecord.status === 'Pending HR Approval';
 
-                      <button 
-                        onClick={() => handleSendReminderMail(mail)}
-                        disabled={mail.isReminderSent || isSendingMail}
-                        className={`px-3 py-2 rounded-xl text-xs font-bold ${mail.isReminderSent ? 'bg-slate-200 text-slate-400' : 'bg-indigo-600 hover:bg-indigo-700 text-white'}`}
-                      >
-                        {mail.isReminderSent ? '✓ Reminder Sent' : '🔔 Send Day-2 HR Reminder'}
-                      </button>
-                    </div>
-                  ))
+                    return (
+                      <div key={mail.id} className="p-4 bg-slate-50 border border-slate-200 rounded-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                        <div>
+                          <span className="font-bold text-xs text-slate-900">{mail.subject}</span>
+                          <p className="text-xs text-slate-500 mt-1 font-mono">To: {mail.to} | Reason: {mail.reason}</p>
+                        </div>
+
+                        {/* Smart Reminder Control: Auto Hides when Approved/Rejected */}
+                        {isPending ? (
+                          <button 
+                            onClick={() => handleSendReminderMail(mail)}
+                            disabled={mail.isReminderSent || isSendingMail}
+                            className={`px-3 py-2 rounded-xl text-xs font-bold ${mail.isReminderSent ? 'bg-slate-200 text-slate-400' : 'bg-indigo-600 hover:bg-indigo-700 text-white'}`}
+                          >
+                            {mail.isReminderSent ? '✓ Reminder Sent' : '🔔 Send Day-2 HR Reminder'}
+                          </button>
+                        ) : (
+                          <span className="px-3 py-1.5 bg-emerald-100 text-emerald-700 font-bold rounded-xl text-xs">
+                            ✓ Action Resolved ({currentLeaveRecord.status})
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })
                 )}
               </div>
             </div>
