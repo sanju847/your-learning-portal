@@ -32,7 +32,22 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
 
   const [clQuota, setClQuota] = useState(() => Number(localStorage.getItem('ylp_cl_quota')) || 12);
-  const [clCarryForward, setClCarryForward] = useState(() => Number(localStorage.getItem('ylp_cl_carry')) || 0);
+  
+  // Year-wise Carry Forward State
+  const [carryForwardHistory, setCarryForwardHistory] = useState(() => {
+    const saved = localStorage.getItem('ylp_cl_carry_history');
+    return saved ? JSON.parse(saved) : [
+      { id: 1, year: '2024', days: 10 },
+      { id: 2, year: '2025', days: 30 }
+    ];
+  });
+
+  const [cfYearInput, setCfYearInput] = useState('2025');
+  const [cfDaysInput, setCfDaysInput] = useState('');
+
+  // Total Carry Forward calculated from year-wise history
+  const clCarryForward = carryForwardHistory.reduce((acc, curr) => acc + Number(curr.days || 0), 0);
+
   const [slQuota, setSlQuota] = useState(() => Number(localStorage.getItem('ylp_sl_quota')) || 6);
   const [sabbaticalQuota, setSabbaticalQuota] = useState(() => Number(localStorage.getItem('ylp_sabbatical_quota')) || 30);
 
@@ -216,12 +231,12 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('ylp_isLoggedIn', isLoggedIn ? 'true' : 'false');
     localStorage.setItem('ylp_cl_quota', clQuota.toString());
-    localStorage.setItem('ylp_cl_carry', clCarryForward.toString());
+    localStorage.setItem('ylp_cl_carry_history', JSON.stringify(carryForwardHistory));
     localStorage.setItem('ylp_sl_quota', slQuota.toString());
     localStorage.setItem('ylp_sabbatical_quota', sabbaticalQuota.toString());
     localStorage.setItem('ylp_holidays', JSON.stringify(companyHolidays));
     localStorage.setItem('ylp_hr_email', hrEmailAddress);
-  }, [isLoggedIn, clQuota, clCarryForward, slQuota, sabbaticalQuota, companyHolidays, hrEmailAddress]);
+  }, [isLoggedIn, clQuota, carryForwardHistory, slQuota, sabbaticalQuota, companyHolidays, hrEmailAddress]);
 
   const speakWelcomeMessage = () => {
     if ('speechSynthesis' in window) {
@@ -238,6 +253,20 @@ export default function App() {
   const remainingCL = totalAvailableCL - usedCL;
   const remainingSL = slQuota - usedSL;
   const remainingSabbatical = sabbaticalQuota - usedSabbatical;
+
+  const handleAddCarryForward = (e) => {
+    e.preventDefault();
+    if (!cfYearInput || !cfDaysInput) return alert('Fill both Year and Days');
+    setCarryForwardHistory([
+      ...carryForwardHistory,
+      { id: Date.now(), year: cfYearInput, days: Number(cfDaysInput) }
+    ]);
+    setCfDaysInput('');
+  };
+
+  const handleDeleteCarryForward = (id) => {
+    setCarryForwardHistory(carryForwardHistory.filter(item => item.id !== id));
+  };
 
   const sendRealMailToHR = async (mailPayload) => {
     setIsSendingMail(true);
@@ -481,7 +510,7 @@ export default function App() {
             </div>
 
             <div className="relative z-10 text-xs text-indigo-300 font-medium">
-              Enterprise Attendance System Developed By Sanju Sanwal
+              Enterprise Attendance System
             </div>
           </div>
 
@@ -629,9 +658,25 @@ export default function App() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
               <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
                 <p className="text-xs font-bold text-slate-400 uppercase mb-1">CASUAL LEAVE (CL)</p>
-                <div className="flex justify-between items-end">
+                <div className="flex justify-between items-end mb-3">
                   <span className="text-4xl font-black text-indigo-600">{remainingCL}</span>
-                  <span className="text-xs text-slate-400 font-semibold">of {totalAvailableCL} Days Total</span>
+                  <span className="text-xs text-slate-400 font-semibold">of {totalAvailableCL} Total ({clQuota} Quota + {clCarryForward} CF)</span>
+                </div>
+                
+                {/* Year-Wise Carry Forward Breakdown Display */}
+                <div className="border-t border-slate-100 pt-2.5">
+                  <p className="text-[11px] font-bold text-slate-400 uppercase mb-1.5">Carry Forward Breakdown:</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {carryForwardHistory.length === 0 ? (
+                      <span className="text-xs text-slate-400 italic">No carry forward</span>
+                    ) : (
+                      carryForwardHistory.map(item => (
+                        <span key={item.id} className="px-2 py-0.5 bg-indigo-50 border border-indigo-100 text-indigo-700 text-xs font-bold rounded-md">
+                          {item.year}: {item.days} Days
+                        </span>
+                      ))
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -881,10 +926,10 @@ export default function App() {
 
         {/* SETTINGS TAB */}
         {activeTab === 'settings' && (
-          <div className="max-w-2xl bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-6">
+          <div className="max-w-3xl bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-6">
             <h3 className="text-xl font-extrabold text-slate-900">Portal Configuration & HR Setup</h3>
 
-            <div className="space-y-4">
+            <div className="space-y-5">
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase mb-1">HR Email Address</label>
                 <input 
@@ -895,7 +940,51 @@ export default function App() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              {/* Year-Wise Carry Forward Management Section */}
+              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-4">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <h4 className="font-bold text-slate-900 text-sm">CL Carry Forward (Yearly Breakdown)</h4>
+                    <p className="text-xs text-slate-500 font-semibold">Total Carry Forward: <span className="font-black text-indigo-600">{clCarryForward} Days</span></p>
+                  </div>
+                </div>
+
+                <form onSubmit={handleAddCarryForward} className="flex gap-2">
+                  <input 
+                    type="text" 
+                    placeholder="Year (e.g. 2025)"
+                    value={cfYearInput}
+                    onChange={e => setCfYearInput(e.target.value)}
+                    className="w-1/3 px-3 py-2 rounded-xl bg-white border border-slate-200 font-semibold text-xs"
+                  />
+                  <input 
+                    type="number" 
+                    placeholder="Days (e.g. 10)"
+                    value={cfDaysInput}
+                    onChange={e => setCfDaysInput(e.target.value)}
+                    className="w-1/3 px-3 py-2 rounded-xl bg-white border border-slate-200 font-semibold text-xs"
+                  />
+                  <button type="submit" className="w-1/3 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-xs shadow-md">
+                    + Add Year Entry
+                  </button>
+                </form>
+
+                <div className="space-y-2">
+                  {carryForwardHistory.map(item => (
+                    <div key={item.id} className="flex justify-between items-center p-3 bg-white rounded-xl border border-slate-200">
+                      <span className="text-xs font-bold text-slate-800">Year {item.year}: <span className="text-indigo-600 font-black">{item.days} Days</span></span>
+                      <button 
+                        onClick={() => handleDeleteCarryForward(item.id)}
+                        className="text-xs text-rose-500 font-bold hover:underline"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Annual CL Quota</label>
                   <input 
@@ -905,18 +994,6 @@ export default function App() {
                     className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 font-semibold text-sm"
                   />
                 </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">CL Carry Forward</label>
-                  <input 
-                    type="number" 
-                    value={clCarryForward}
-                    onChange={e => setClCarryForward(Number(e.target.value))}
-                    className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 font-semibold text-sm"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Annual SL Quota</label>
                   <input 
