@@ -30,8 +30,19 @@ export default function App() {
   const [loginError, setLoginError] = useState('');
   const [activeTab, setActiveTab] = useState('dashboard');
 
-  // Custom Attendance Toast Modal
+  // Center Toast Notification & Custom Delete Modal States
   const [toastNotification, setToastNotification] = useState({ show: false, title: '', message: '' });
+  const [deleteCandidateDate, setDeleteCandidateDate] = useState(null);
+
+  // Blacklist state to stop Auto-Mark Absent from regenerating deleted entries
+  const [deletedDates, setDeletedDates] = useState(() => {
+    const saved = localStorage.getItem('ylp_deleted_attendance_dates');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  useEffect(() => {
+    localStorage.setItem('ylp_deleted_attendance_dates', JSON.stringify(deletedDates));
+  }, [deletedDates]);
 
   // Quota & Carry Forward States
   const [clQuota, setClQuota] = useState(12);
@@ -93,11 +104,12 @@ export default function App() {
   const VALID_PASS = 'Admin@321';
   const JOINING_DATE = '2023-01-01';
 
+  // Smooth Center Toast Helper
   const triggerToast = (title, message) => {
     setToastNotification({ show: true, title, message });
     setTimeout(() => {
       setToastNotification({ show: false, title: '', message: '' });
-    }, 4000);
+    }, 2500);
   };
 
   const checkThreeYearsCompleted = (joinDateStr) => {
@@ -187,9 +199,11 @@ export default function App() {
     }
   };
 
+  // Fixed Auto-Mark Absent (Honors Deleted Blacklist)
   const checkAndAutoMarkAbsent = async (currentRecords) => {
     const today = new Date();
     const recordsMap = new Set(currentRecords.map(r => r.date));
+    const savedBlacklist = JSON.parse(localStorage.getItem('ylp_deleted_attendance_dates') || '[]');
     const newAbsentEntries = [];
 
     for (let i = 1; i <= 7; i++) {
@@ -199,7 +213,8 @@ export default function App() {
       const dayNum = pastDate.getDay();
 
       if (dayNum !== 0 && dayNum !== 6) {
-        if (!recordsMap.has(dateStr)) {
+        // Only insert if date is NOT in database and NOT manually deleted by user
+        if (!recordsMap.has(dateStr) && !savedBlacklist.includes(dateStr)) {
           newAbsentEntries.push({
             date: dateStr,
             status: 'Absent',
@@ -339,6 +354,8 @@ export default function App() {
     const { error } = await supabase.from('attendance').upsert([payload], { onConflict: 'date' });
     
     if (!error) {
+      // Remove from blacklist if marked present again
+      setDeletedDates(prev => prev.filter(dt => dt !== targetDate));
       await fetchAttendance();
       triggerToast(
         "Attendance Marked!", 
@@ -349,16 +366,27 @@ export default function App() {
     }
   };
 
-  // DELETE WRONG ATTENDANCE ENTRY
-  const handleDeleteAttendanceRecord = async (dateStr) => {
-    if (window.confirm(`Delete attendance record for ${dateStr}?`)) {
-      const { error } = await supabase.from('attendance').delete().eq('date', dateStr);
-      if (!error) {
-        await fetchAttendance();
-        triggerToast("Record Removed", `Attendance entry for ${dateStr} has been deleted.`);
-      } else {
-        alert("⚠️ Failed to delete entry: " + error.message);
-      }
+  // PERMANENT DELETE HANDLER (State + DB + Local Blacklist)
+  const confirmPermanentDelete = async () => {
+    if (!deleteCandidateDate) return;
+    const dateStr = deleteCandidateDate;
+
+    // 1. Delete from Supabase Database
+    const { error } = await supabase.from('attendance').delete().eq('date', dateStr);
+    
+    if (!error) {
+      // 2. Blacklist date in local state & localStorage so Auto-Absent won't re-create it
+      setDeletedDates(prev => [...prev, dateStr]);
+      
+      // 3. Remove date from current local UI state immediately
+      setAttendanceRecords(prev => prev.filter(r => r.date !== dateStr));
+      
+      setDeleteCandidateDate(null);
+      triggerToast("Record Removed", `Attendance entry for ${dateStr} has been deleted permanently.`);
+      await fetchAttendance();
+    } else {
+      alert("⚠️ Failed to delete entry: " + error.message);
+      setDeleteCandidateDate(null);
     }
   };
 
@@ -376,10 +404,11 @@ export default function App() {
     const { error } = await supabase.from('attendance').upsert([payload], { onConflict: 'date' });
     
     if (!error) {
+      setDeletedDates(prev => prev.filter(dt => dt !== extraWorkDate));
       setExtraWorkDate('');
       setExtraWorkReason('');
       await fetchAttendance();
-      triggerToast("Extra Day Logged! 👍", `Extra working day saved for ${extraWorkDate}`);
+      triggerToast("Extra Day Logged!", `Extra working day saved for ${extraWorkDate}`);
     } else {
       alert("⚠️ Error saving record: " + error.message);
     }
@@ -396,10 +425,12 @@ export default function App() {
   const currentMonth = new Date().getMonth();
   const currentYear = new Date().getFullYear();
 
-  const currentMonthAttendance = attendanceRecords.filter(r => {
-    const d = new Date(r.date);
-    return d.getMonth() === currentMonth && d.getFullYear() === currentYear && r.status === 'Present';
-  });
+  const currentMonthAttendance = attendanceRecords
+    .filter(r => !deletedDates.includes(r.date))
+    .filter(r => {
+      const d = new Date(r.date);
+      return d.getMonth() === currentMonth && d.getFullYear() === currentYear && r.status === 'Present';
+    });
 
   const extraDaysCount = currentMonthAttendance.filter(r => r.type === 'Extra Working Day' || r.type === 'Extra Weekend Work').length;
 
@@ -574,7 +605,7 @@ export default function App() {
 
     setReminderSentMap(prev => ({ ...prev, [leaveItem.id]: true }));
     setIsSendingMail(false);
-    triggerToast("Reminder Sent! 📩", `Escalation mail sent to ${hrEmailAddress}`);
+    triggerToast("Reminder Sent!", `Escalation mail sent to ${hrEmailAddress}`);
   };
 
   const handleAddHoliday = (e) => {
@@ -600,12 +631,14 @@ export default function App() {
       days.push(<div key={`empty-${i}`} className="h-10"></div>);
     }
 
+    const filteredRecords = attendanceRecords.filter(r => !deletedDates.includes(r.date));
+
     for (let day = 1; day <= daysInMonth; day++) {
       const formattedMonth = String(calendarViewMonth + 1).padStart(2, '0');
       const formattedDay = String(day).padStart(2, '0');
       const fullDateStr = `${calendarViewYear}-${formattedMonth}-${formattedDay}`;
 
-      const rec = attendanceRecords.find(r => r.date === fullDateStr);
+      const rec = filteredRecords.find(r => r.date === fullDateStr);
       const isToday = fullDateStr === todayStr;
 
       let cellStyle = "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100";
@@ -814,16 +847,45 @@ export default function App() {
   return (
     <div className="min-h-screen w-full flex flex-col md:flex-row bg-slate-100 font-sans overflow-x-hidden relative">
       
-      {/* FLOATING THUMBS UP POPUP TOAST */}
+      {/* --- CENTER CLEAN TOAST NOTIFICATION (NO BOUNCE) --- */}
       {toastNotification.show && (
-        <div className="fixed top-5 right-5 z-50 animate-bounce transition-all">
-          <div className="bg-slate-900/95 backdrop-blur-md text-white border border-emerald-500/40 p-4 rounded-2xl shadow-2xl flex items-center gap-3.5 max-w-sm">
-            <div className="w-12 h-12 bg-emerald-500/20 border border-emerald-500/40 rounded-xl flex items-center justify-center text-2xl shrink-0">
-              👍
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/30 backdrop-blur-xs transition-opacity duration-200">
+          <div className="bg-slate-900 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-4 border border-slate-700 max-w-sm">
+            <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-lg shrink-0">
+              ✓
             </div>
             <div>
-              <h4 className="font-extrabold text-sm text-emerald-400">{toastNotification.title}</h4>
-              <p className="text-xs text-slate-300 font-medium leading-snug">{toastNotification.message}</p>
+              <h4 className="font-bold text-sm text-slate-100">{toastNotification.title}</h4>
+              <p className="text-xs text-slate-400 mt-0.5">{toastNotification.message}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- MATCHING CUSTOM DELETE CONFIRMATION MODAL --- */}
+      {deleteCandidateDate && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm transition-all">
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl border border-slate-100 text-center">
+            <div className="w-12 h-12 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto mb-4 font-bold text-lg">
+              ✕
+            </div>
+            <h3 className="text-base font-bold text-slate-800 mb-1">Delete Attendance Entry</h3>
+            <p className="text-xs text-slate-500 mb-6">
+              Are you sure you want to delete attendance record for <span className="font-bold text-slate-700">{deleteCandidateDate}</span>? It will not reappear.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setDeleteCandidateDate(null)}
+                className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmPermanentDelete}
+                className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold rounded-xl transition shadow-md shadow-rose-600/20"
+              >
+                Delete Record
+              </button>
             </div>
           </div>
         </div>
@@ -1103,29 +1165,31 @@ export default function App() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {attendanceRecords.length === 0 ? (
+                      {attendanceRecords.filter(r => !deletedDates.includes(r.date)).length === 0 ? (
                         <tr><td colSpan="5" className="py-4 text-center text-slate-400">No attendance records found yet.</td></tr>
                       ) : (
-                        attendanceRecords.map(r => (
-                          <tr key={r.id || r.date}>
-                            <td className="py-3 px-2 font-bold">{r.date}</td>
-                            <td className="py-3 px-2">
-                              <span className={`px-2 py-0.5 rounded font-bold ${r.status === 'Present' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>
-                                {r.status}
-                              </span>
-                            </td>
-                            <td className="py-3 px-2 font-semibold text-slate-600">{r.type}</td>
-                            <td className="py-3 px-2 text-slate-500">{r.note}</td>
-                            <td className="py-3 px-2 text-right">
-                              <button 
-                                onClick={() => handleDeleteAttendanceRecord(r.date)}
-                                className="px-2 py-1 text-[11px] font-bold rounded-lg border bg-rose-50 text-rose-600 border-rose-200 transition hover:bg-rose-600 hover:text-white"
-                              >
-                                🗑️ Delete
-                              </button>
-                            </td>
-                          </tr>
-                        ))
+                        attendanceRecords
+                          .filter(r => !deletedDates.includes(r.date))
+                          .map(r => (
+                            <tr key={r.id || r.date}>
+                              <td className="py-3 px-2 font-bold">{r.date}</td>
+                              <td className="py-3 px-2">
+                                <span className={`px-2 py-0.5 rounded font-bold ${r.status === 'Present' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>
+                                  {r.status}
+                                </span>
+                              </td>
+                              <td className="py-3 px-2 font-semibold text-slate-600">{r.type}</td>
+                              <td className="py-3 px-2 text-slate-500">{r.note}</td>
+                              <td className="py-3 px-2 text-right">
+                                <button 
+                                  onClick={() => setDeleteCandidateDate(r.date)}
+                                  className="px-2 py-1 text-[11px] font-bold rounded-lg border bg-rose-50 text-rose-600 border-rose-200 transition hover:bg-rose-600 hover:text-white"
+                                >
+                                  🗑️ Delete
+                                </button>
+                              </td>
+                            </tr>
+                          ))
                       )}
                     </tbody>
                   </table>
