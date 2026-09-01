@@ -6,7 +6,7 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// 🔊 Direct Simple Sounds (Same as Submission Sound)
+// 🔊 Sound Effects System
 const playSoundEffect = (type) => {
   try {
     let soundUrl = '';
@@ -97,7 +97,6 @@ export default function App() {
     }
   };
 
-  // 🔔 Automatic sound trigger when HR updates status
   const fetchLeaves = async (showLoading = false) => {
     if (showLoading) setIsFetchingData(true);
     
@@ -295,14 +294,13 @@ export default function App() {
     setActiveTab('dashboard');
   };
 
-  // 🛑 Strict Reason Validation Check (Stops Form Execution Immediately)
   const handleApplyLeave = async (e) => {
     e.preventDefault();
 
     const formattedReason = leaveReason ? leaveReason.trim() : '';
     if (!formattedReason) {
-      alert("⚠️ Reason likhna zaroori hai! (Leave reason is mandatory)");
-      return; // STOP! Email ya DB update bilkul nahi hoga
+      alert("⚠️ Reason likhna zaroori hai!");
+      return;
     }
 
     let count = 1;
@@ -432,7 +430,6 @@ export default function App() {
                   {hrActionDetails.status}
                 </span>.
               </p>
-              <p className="text-xs text-slate-400">Employee dashboard status has been updated automatically.</p>
             </div>
           )}
 
@@ -446,7 +443,6 @@ export default function App() {
                 This leave request (#{hrActionDetails.leaveId}) was already recorded as{' '}
                 <span className="font-bold text-slate-900">{hrActionDetails.status}</span>.
               </p>
-              <p className="text-xs text-slate-400">No further modifications can be made from this email link.</p>
             </div>
           )}
 
@@ -456,7 +452,6 @@ export default function App() {
                 ⚠️
               </div>
               <h2 className="text-xl font-bold text-slate-900">Action Failed</h2>
-              <p className="text-sm text-slate-500 font-medium">Unable to update leave request status or invalid link ID.</p>
             </div>
           )}
         </div>
@@ -483,9 +478,6 @@ export default function App() {
                 Corporate Workspace
               </div>
               <h2 className="text-4xl font-extrabold tracking-tight">Your Learning Portal</h2>
-              <p className="text-indigo-200 text-sm mt-3 leading-relaxed">
-                Seamless leave tracking, custom holiday management, and employee profile dashboard.
-              </p>
             </div>
 
             <div className="relative z-10 text-xs text-indigo-300 font-medium">
@@ -562,8 +554,6 @@ export default function App() {
               <p><strong>To HR Email:</strong> {currentMailData.to}</p>
               <p><strong>Subject:</strong> {currentMailData.subject}</p>
               <p><strong>Reason:</strong> {currentMailData.reason}</p>
-              <hr className="border-slate-200 my-2" />
-              <p className="whitespace-pre-line font-sans text-xs leading-relaxed text-slate-600">{currentMailData.body}</p>
             </div>
 
             <div className="mt-6">
@@ -630,9 +620,6 @@ export default function App() {
           </div>
           <div className="flex items-center gap-3">
             <span className="text-xs text-slate-400 font-semibold hidden sm:inline">Last Sync: {lastSyncedTime || 'Just now'}</span>
-            <div className="px-4 py-2 bg-emerald-100 text-emerald-800 rounded-full text-xs font-bold border border-emerald-200">
-              Active Member Status
-            </div>
           </div>
         </header>
 
@@ -660,7 +647,6 @@ export default function App() {
                 <p className="text-xs font-bold text-amber-700 uppercase mb-1">⭐ SABBATICAL (3 YRS)</p>
                 <div className="flex justify-between items-end">
                   <span className="text-4xl font-black text-amber-600">{remainingSabbatical}</span>
-                  <span className="text-xs text-amber-700 font-semibold">{isSabbaticalEligible ? '30 Days Available' : 'Requires 3 Yrs Tenure'}</span>
                 </div>
               </div>
 
@@ -668,7 +654,6 @@ export default function App() {
                 <p className="text-xs font-bold text-slate-400 uppercase mb-1">TOTAL LEAVES USED</p>
                 <div className="flex justify-between items-end">
                   <span className="text-4xl font-black text-emerald-600">{usedCL + usedSL + usedSabbatical}</span>
-                  <span className="text-xs text-slate-400 font-semibold">Days Deducted</span>
                 </div>
               </div>
             </div>
@@ -833,6 +818,7 @@ export default function App() {
                   <textarea 
                     rows="3"
                     required
+                    autoComplete="off"
                     placeholder="Enter reason for leave request..."
                     value={leaveReason}
                     onChange={e => setLeaveReason(e.target.value)}
@@ -900,7 +886,7 @@ export default function App() {
 
             <div className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">HR Email Address (Notifications Target)</label>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">HR Email Address</label>
                 <input 
                   type="email" 
                   value={hrEmailAddress}
@@ -941,7 +927,7 @@ export default function App() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Sabbatical Quota (3+ Yrs)</label>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Sabbatical Quota</label>
                   <input 
                     type="number" 
                     value={sabbaticalQuota}
