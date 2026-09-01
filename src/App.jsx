@@ -51,10 +51,7 @@ export default function App() {
   });
 
   // Applied Leaves Logs
-  const [appliedLeaves, setAppliedLeaves] = useState(() => {
-    const saved = localStorage.getItem('ylp_applied_leaves');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [appliedLeaves, setAppliedLeaves] = useState([]);
 
   // Form Controls
   const [leaveCategory, setLeaveCategory] = useState('CL');
@@ -104,32 +101,19 @@ export default function App() {
   };
 
   useEffect(() => {
-    if (isLoggedIn) {
-      fetchLeaves();
-    }
+    fetchLeaves();
 
-    const handleEmailAction = async () => {
-      const params = new URLSearchParams(window.location.search);
-      const action = params.get('action');
-      const leaveId = params.get('id');
+    // Setup Supabase Realtime Subscription for Background Status Updates
+    const channel = supabase
+      .channel('schema-db-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'leaves' }, () => {
+        fetchLeaves();
+      })
+      .subscribe();
 
-      if (action && leaveId) {
-        const newStatus = action === 'approve' ? 'Approved' : 'Rejected';
-
-        const { error } = await supabase
-          .from('leaves')
-          .update({ status: newStatus })
-          .eq('id', leaveId);
-
-        if (!error) {
-          alert(`Leave status updated to: ${newStatus}`);
-          window.history.replaceState({}, document.title, window.location.pathname);
-          fetchLeaves();
-        }
-      }
+    return () => {
+      supabase.removeChannel(channel);
     };
-
-    handleEmailAction();
   }, [isLoggedIn]);
 
   // Login Background Images
@@ -157,10 +141,9 @@ export default function App() {
     localStorage.setItem('ylp_sl_quota', slQuota.toString());
     localStorage.setItem('ylp_sabbatical_quota', sabbaticalQuota.toString());
     localStorage.setItem('ylp_holidays', JSON.stringify(companyHolidays));
-    localStorage.setItem('ylp_applied_leaves', JSON.stringify(appliedLeaves));
     localStorage.setItem('ylp_email_logs', JSON.stringify(emailLogs));
     localStorage.setItem('ylp_hr_email', hrEmailAddress);
-  }, [isLoggedIn, clQuota, clCarryForward, slQuota, sabbaticalQuota, companyHolidays, appliedLeaves, emailLogs, hrEmailAddress]);
+  }, [isLoggedIn, clQuota, clCarryForward, slQuota, sabbaticalQuota, companyHolidays, emailLogs, hrEmailAddress]);
 
   // Welcome Speech
   const speakWelcomeMessage = () => {
@@ -173,20 +156,22 @@ export default function App() {
   };
 
   // Leave Deductions
-  const usedCL = appliedLeaves.filter(i => i.category === 'CL').reduce((s, i) => s + (i.daysCount || i.days_count || 1), 0);
-  const usedSL = appliedLeaves.filter(i => i.category === 'SL').reduce((s, i) => s + (i.daysCount || i.days_count || 1), 0);
-  const usedSabbatical = appliedLeaves.filter(i => i.category === 'Sabbatical').reduce((s, i) => s + (i.daysCount || i.days_count || 1), 0);
+  const usedCL = appliedLeaves.filter(i => i.category === 'CL' && i.status === 'Approved').reduce((s, i) => s + (i.days_count || 1), 0);
+  const usedSL = appliedLeaves.filter(i => i.category === 'SL' && i.status === 'Approved').reduce((s, i) => s + (i.days_count || 1), 0);
+  const usedSabbatical = appliedLeaves.filter(i => i.category === 'Sabbatical' && i.status === 'Approved').reduce((s, i) => s + (i.days_count || 1), 0);
 
   const remainingCL = totalAvailableCL - usedCL;
   const remainingSL = slQuota - usedSL;
   const remainingSabbatical = sabbaticalQuota - usedSabbatical;
 
-  // Real Email Dispatcher Function
+  // Direct Supabase API links for Email approval buttons
   const sendRealMailToHR = async (mailPayload) => {
     setIsSendingMail(true);
     
     if (window.emailjs) {
       try {
+        const approveUrl = `${SUPABASE_URL}/rest/v1/leaves?id=eq.${mailPayload.leaveId}`;
+        
         await window.emailjs.send(
           'service_ts2aotz',   // Service ID
           'template_odlpu7u',  // Template ID
@@ -202,16 +187,14 @@ export default function App() {
             applied_date: mailPayload.sentDate,
             subject: mailPayload.subject,
             message: mailPayload.body,
-            leave_id: mailPayload.leaveId
+            leave_id: mailPayload.leaveId,
+            approve_link: approveUrl
           },
           'O5FhcUXl6UTLrRv7n'    // Public Key
         );
-        console.log(`Real email dispatched successfully to ${hrEmailAddress}!`);
       } catch (err) {
         console.error("EmailJS sending error:", err);
       }
-    } else {
-      console.warn("EmailJS SDK script tag missing in index.html");
     }
     
     setIsSendingMail(false);
@@ -291,19 +274,9 @@ export default function App() {
       ])
       .select();
 
-    const dbRecord = data && data[0] ? data[0] : null;
-    const leaveId = dbRecord ? dbRecord.id : Date.now();
+    if (error || !data) return alert("Failed to save to Database. Check internet/database.");
 
-    const newRecord = {
-      id: leaveId,
-      category: leaveCategory,
-      dateStr,
-      daysCount: count,
-      reason: leaveReason || 'Personal Request',
-      status: 'Pending HR Approval'
-    };
-
-    setAppliedLeaves([newRecord, ...appliedLeaves]);
+    const leaveId = data[0].id;
 
     const mailDraft = {
       id: Date.now(),
@@ -337,8 +310,7 @@ export default function App() {
   const handleDeleteLeave = async (id) => {
     if (window.confirm('Remove this leave entry and restore balance?')) {
       await supabase.from('leaves').delete().eq('id', id);
-      setAppliedLeaves(appliedLeaves.filter(i => i.id !== id));
-      setEmailLogs(emailLogs.filter(i => i.leaveId !== id));
+      fetchLeaves();
     }
   };
 
@@ -361,20 +333,6 @@ export default function App() {
     }));
     setIsSendingMail(false);
     alert(`Day-2 Escalation Reminder Real Email Sent to ${hrEmailAddress}!`);
-  };
-
-  const handleAddHoliday = (e) => {
-    e.preventDefault();
-    if (!holidayDate || !holidayTitle) return;
-    setCompanyHolidays([...companyHolidays, { id: Date.now(), date: holidayDate, title: holidayTitle }]);
-    setHolidayDate('');
-    setHolidayTitle('');
-  };
-
-  const handleDeleteHoliday = (id) => {
-    if (window.confirm('Remove this holiday entry?')) {
-      setCompanyHolidays(companyHolidays.filter(i => i.id !== id));
-    }
   };
 
   // ---------------- LOGIN PAGE ----------------
@@ -411,7 +369,7 @@ export default function App() {
           <div className="w-full md:w-1/2 bg-white p-10 flex flex-col justify-center">
             <div className="mb-8">
               <h3 className="text-3xl font-extrabold text-slate-900">Sign In</h3>
-              <p className="text-slate-500 text-xs mt-1">Enter your work credentials to continue.</p>
+              <p className="text-slate-500 text-xs mt-1">Enter credentials for Your Learning Portal</p>
             </div>
 
             {loginError && (
@@ -422,7 +380,7 @@ export default function App() {
 
             <form onSubmit={handleLogin} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Employee Username</label>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">USERNAME</label>
                 <input 
                   type="text" 
                   required
@@ -434,7 +392,7 @@ export default function App() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Password</label>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">PASSWORD</label>
                 <input 
                   type="password" 
                   required
@@ -617,8 +575,8 @@ export default function App() {
                               {item.category}
                             </span>
                           </td>
-                          <td className="py-3.5 px-4 font-semibold text-slate-800">{item.dateStr || item.date_str}</td>
-                          <td className="py-3.5 px-4 font-semibold text-slate-600">{item.daysCount || item.days_count} Day(s)</td>
+                          <td className="py-3.5 px-4 font-semibold text-slate-800">{item.date_str || item.dateStr}</td>
+                          <td className="py-3.5 px-4 font-semibold text-slate-600">{item.days_count || item.daysCount} Day(s)</td>
                           <td className="py-3.5 px-4 text-slate-500">{item.reason}</td>
                           <td className="py-3.5 px-4">
                             <span className={`px-3 py-1 rounded-full text-xs font-bold ${item.status === 'Approved' ? 'bg-emerald-100 text-emerald-800' : item.status === 'Rejected' ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800'}`}>
@@ -712,104 +670,74 @@ export default function App() {
 
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase mb-2">Selection Mode</label>
-                  <div className="flex gap-4">
+                  <div className="flex gap-4 mb-3">
                     <label className="flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer">
-                      <input type="radio" name="mode" checked={dateMode === 'single'} onChange={() => setDateMode('single')} /> Single Day
+                      <input type="radio" checked={dateMode === 'single'} onChange={() => setDateMode('single')} /> Single Day
                     </label>
                     <label className="flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer">
-                      <input type="radio" name="mode" checked={dateMode === 'range'} onChange={() => setDateMode('range')} /> Date Range
+                      <input type="radio" checked={dateMode === 'range'} onChange={() => setDateMode('range')} /> Multi Day Range
                     </label>
                   </div>
-                </div>
 
-                {dateMode === 'single' ? (
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Select Date</label>
+                  {dateMode === 'single' ? (
                     <input 
                       type="date" 
-                      required
-                      value={singleDate}
-                      onChange={e => setSingleDate(e.target.value)}
-                      className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-semibold"
+                      required 
+                      value={singleDate} 
+                      onChange={e => setSingleDate(e.target.value)} 
+                      className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold"
                     />
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Start Date</label>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-3">
                       <input 
                         type="date" 
-                        required
-                        value={startDate}
-                        onChange={e => setStartDate(e.target.value)}
-                        className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-semibold"
+                        required 
+                        value={startDate} 
+                        onChange={e => setStartDate(e.target.value)} 
+                        className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold"
                       />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 uppercase mb-1">End Date</label>
                       <input 
                         type="date" 
-                        required
-                        value={endDate}
-                        onChange={e => setEndDate(e.target.value)}
-                        className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-semibold"
+                        required 
+                        value={endDate} 
+                        onChange={e => setEndDate(e.target.value)} 
+                        className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold"
                       />
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Reason / Remarks</label>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-2">Reason for Leave</label>
                   <textarea 
-                    rows="3"
-                    placeholder="Enter reason for leave application..."
-                    value={leaveReason}
+                    rows="3" 
+                    placeholder="Provide details for HR review..." 
+                    value={leaveReason} 
                     onChange={e => setLeaveReason(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-semibold"
+                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-600"
                   ></textarea>
                 </div>
 
                 <button 
                   type="submit" 
                   disabled={isSendingMail}
-                  className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl shadow-lg transition text-sm"
+                  className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl shadow-md text-sm transition"
                 >
-                  {isSendingMail ? 'Sending Notification Email...' : 'Submit Leave Request'}
+                  {isSendingMail ? 'Sending Email to HR...' : 'Submit Application & Notify HR'}
                 </button>
               </form>
             </div>
 
-            {/* Holidays List */}
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-4">
-              <h3 className="text-lg font-bold text-slate-800 border-b border-slate-100 pb-3">Company Holiday Calendar</h3>
-              
-              <form onSubmit={handleAddHoliday} className="flex gap-2">
-                <input 
-                  type="date" 
-                  required 
-                  value={holidayDate}
-                  onChange={e => setHolidayDate(e.target.value)}
-                  className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold"
-                />
-                <input 
-                  type="text" 
-                  placeholder="Holiday Title" 
-                  required 
-                  value={holidayTitle}
-                  onChange={e => setHolidayTitle(e.target.value)}
-                  className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold"
-                />
-                <button type="submit" className="px-4 py-2 bg-slate-900 text-white font-bold text-xs rounded-xl">Add</button>
-              </form>
-
-              <div className="divide-y divide-slate-100">
-                {companyHolidays.map(item => (
-                  <div key={item.id} className="py-3 flex justify-between items-center">
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+              <h3 className="text-lg font-bold text-slate-800 mb-4">Company Holidays (2026)</h3>
+              <div className="space-y-3">
+                {companyHolidays.map(h => (
+                  <div key={h.id} className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl flex justify-between items-center">
                     <div>
-                      <p className="font-bold text-xs text-slate-900">{item.title}</p>
-                      <p className="text-xs text-slate-400 font-mono">{item.date}</p>
+                      <p className="font-bold text-slate-900 text-sm">{h.title}</p>
+                      <p className="text-xs text-slate-500 font-mono mt-0.5">{h.date}</p>
                     </div>
-                    <button onClick={() => handleDeleteHoliday(item.id)} className="text-xs text-red-500 hover:underline">Remove</button>
+                    <span className="text-xs font-bold bg-indigo-50 text-indigo-700 px-3 py-1 rounded-full">Official</span>
                   </div>
                 ))}
               </div>
@@ -819,20 +747,18 @@ export default function App() {
 
         {/* SETTINGS TAB */}
         {activeTab === 'settings' && (
-          <div className="max-w-xl bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-4">
-            <h3 className="text-lg font-bold text-slate-800 border-b border-slate-100 pb-3">Portal Settings & Email Dispatcher</h3>
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 max-w-xl">
+            <h3 className="text-lg font-bold text-slate-800 mb-4">HR & Email Integration Settings</h3>
             <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase mb-1">HR Receiver Email</label>
+              <label className="block text-xs font-bold text-slate-700 uppercase mb-2">HR Email Address</label>
               <input 
                 type="email" 
-                value={hrEmailAddress}
-                onChange={e => setHrEmailAddress(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-semibold"
+                value={hrEmailAddress} 
+                onChange={e => setHrEmailAddress(e.target.value)} 
+                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold"
               />
+              <p className="text-xs text-slate-400 mt-2">All leave requests & reminder emails will be dispatched to this email address via EmailJS.</p>
             </div>
-            <p className="text-xs text-slate-500 leading-relaxed">
-              All leave notification emails from the portal will automatically dispatch to this address.
-            </p>
           </div>
         )}
 
