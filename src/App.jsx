@@ -1,4 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { createClient } from '@supabase/supabase-js';
+
+const SUPABASE_URL = 'https://mhiqoknxkwmbisjurhvs.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1oaXFva254a3dtYmlzanVyaHZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgyMjY2OTksImV4cCI6MjEwMzgwMjY5OX0.OlJeKPhziAYxTcwKDdJJhrobQIjW_wbFPu1UOjHWZps';
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 export default function App() {
   // Authentication State
@@ -9,29 +15,6 @@ export default function App() {
   const [usernameInput, setUsernameInput] = useState('');
   const [passwordInput, setPasswordInput] = useState('');
   const [loginError, setLoginError] = useState('');
-
-  // PERMANENT CREDENTIALS
-  const VALID_USER = 'Sanju';
-  const VALID_PASS = 'Admin@321';
-  const JOINING_DATE = '2023-01-01';
-
-  // Check 3 Years Eligibility
-  const checkThreeYearsCompleted = (joinDateStr) => {
-    const joinDate = new Date(joinDateStr);
-    const currentDate = new Date();
-    const diffInTime = currentDate.getTime() - joinDate.getTime();
-    const diffInDays = diffInTime / (1000 * 3600 * 24);
-    return diffInDays >= 1095;
-  };
-
-  const isSabbaticalEligible = checkThreeYearsCompleted(JOINING_DATE);
-
-  const currentUser = {
-    name: 'Sanju',
-    employeeId: 'EMP ID 0079',
-    joiningDate: JOINING_DATE,
-    role: `Operations Lead (${isSabbaticalEligible ? '3+ Yrs Tenure' : 'Under 3 Yrs Tenure'})`
-  };
 
   // Navigation
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -44,8 +27,8 @@ export default function App() {
 
   const totalAvailableCL = clQuota + clCarryForward;
 
-  // HR EMAIL ADDRESS SET TO sanju@yourlearnings.com
-  const [hrEmailAddress, setHrEmailAddress] = useState('sanju@yourlearnings.com');
+  // HR Email Address
+  const [hrEmailAddress, setHrEmailAddress] = useState(() => localStorage.getItem('ylp_hr_email') || 'sanju@yourlearnings.com');
   
   const [isSendingMail, setIsSendingMail] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -84,6 +67,70 @@ export default function App() {
   // Holiday Form Controls
   const [holidayDate, setHolidayDate] = useState('');
   const [holidayTitle, setHolidayTitle] = useState('');
+
+  // PERMANENT CREDENTIALS
+  const VALID_USER = 'Sanju';
+  const VALID_PASS = 'Admin@321';
+  const JOINING_DATE = '2023-01-01';
+
+  // Check 3 Years Eligibility
+  const checkThreeYearsCompleted = (joinDateStr) => {
+    const joinDate = new Date(joinDateStr);
+    const currentDate = new Date();
+    const diffInTime = currentDate.getTime() - joinDate.getTime();
+    const diffInDays = diffInTime / (1000 * 3600 * 24);
+    return diffInDays >= 1095;
+  };
+
+  const isSabbaticalEligible = checkThreeYearsCompleted(JOINING_DATE);
+
+  const currentUser = {
+    name: 'Sanju',
+    employeeId: 'EMP ID 0079',
+    joiningDate: JOINING_DATE,
+    role: `Operations Lead (${isSabbaticalEligible ? '3+ Yrs Tenure' : 'Under 3 Yrs Tenure'})`
+  };
+
+  // Database Fetch Function
+  const fetchLeaves = async () => {
+    const { data, error } = await supabase
+      .from('leaves')
+      .select('*')
+      .order('created_at', { ascending: false });
+    
+    if (!error && data) {
+      setAppliedLeaves(data);
+    }
+  };
+
+  useEffect(() => {
+    if (isLoggedIn) {
+      fetchLeaves();
+    }
+
+    const handleEmailAction = async () => {
+      const params = new URLSearchParams(window.location.search);
+      const action = params.get('action');
+      const leaveId = params.get('id');
+
+      if (action && leaveId) {
+        const newStatus = action === 'approve' ? 'Approved' : 'Rejected';
+
+        const { error } = await supabase
+          .from('leaves')
+          .update({ status: newStatus })
+          .eq('id', leaveId);
+
+        if (!error) {
+          alert(`Leave status updated to: ${newStatus}`);
+          window.history.replaceState({}, document.title, window.location.pathname);
+          fetchLeaves();
+        }
+      }
+    };
+
+    handleEmailAction();
+  }, [isLoggedIn]);
 
   // Login Background Images
   const bgImages = [
@@ -134,7 +181,7 @@ export default function App() {
   const remainingSL = slQuota - usedSL;
   const remainingSabbatical = sabbaticalQuota - usedSabbatical;
 
-  // Real Email Dispatcher Function (EmailJS Service with Live Keys)
+// Real Email Dispatcher Function
   const sendRealMailToHR = async (mailPayload) => {
     setIsSendingMail(true);
     
@@ -144,7 +191,7 @@ export default function App() {
           'service_ts2aotz',   // Service ID
           'template_odlpu7u',  // Template ID
           {
-            to_email: hrEmailAddress, // Target Mail: sanju@yourlearnings.com
+            to_email: hrEmailAddress,
             hr_email: hrEmailAddress,
             employee_name: currentUser.name,
             employee_id: currentUser.employeeId,
@@ -154,7 +201,8 @@ export default function App() {
             reason: mailPayload.reason,
             applied_date: mailPayload.sentDate,
             subject: mailPayload.subject,
-            message: mailPayload.body
+            message: mailPayload.body,
+            leave_id: mailPayload.leaveId // <-- YE NEW LINE ADD KARNI HAI
           },
           'O5FhcUXl6UTLrRv7n'    // Public Key
         );
@@ -208,11 +256,11 @@ export default function App() {
     let dateStr = '';
 
     if (dateMode === 'single') {
-      if (!singleDate) return;
+      if (!singleDate) return alert('Please select a date');
       dateStr = singleDate;
       count = 1;
     } else {
-      if (!startDate || !endDate) return;
+      if (!startDate || !endDate) return alert('Please select both start and end dates');
       const d1 = new Date(startDate);
       const d2 = new Date(endDate);
       if (d2 < d1) return alert('End Date must be after Start Date');
@@ -307,13 +355,6 @@ export default function App() {
   const handleDeleteHoliday = (id) => {
     if (window.confirm('Remove this holiday entry?')) {
       setCompanyHolidays(companyHolidays.filter(i => i.id !== id));
-    }
-  };
-
-  const handleYearEndReset = () => {
-    if (window.confirm('Simulate Year-End Rollover? Unused CL will be Carried Forward, and SL will lapse.')) {
-      setClCarryForward(remainingCL);
-      alert(`Year-End Completed! ${remainingCL} Unused CL carried forward to next year. SL reset to 6.`);
     }
   };
 
@@ -664,88 +705,101 @@ export default function App() {
 
                 {dateMode === 'single' ? (
                   <div>
-                    <label className="block text-xs font-semibold text-slate-600 mb-1">Select Date</label>
-                    <input type="date" required value={singleDate} onChange={e => setSingleDate(e.target.value)} className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50 text-sm font-semibold" />
+                    <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Select Date</label>
+                    <input 
+                      type="date" 
+                      required
+                      value={singleDate} 
+                      onChange={e => setSingleDate(e.target.value)}
+                      className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-600"
+                    />
                   </div>
                 ) : (
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-semibold text-slate-600 mb-1">Start Date</label>
-                      <input type="date" required value={startDate} onChange={e => setStartDate(e.target.value)} className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50 text-sm font-semibold" />
+                      <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Start Date</label>
+                      <input 
+                        type="date" 
+                        required
+                        value={startDate} 
+                        onChange={e => setStartDate(e.target.value)}
+                        className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-600"
+                      />
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-slate-600 mb-1">End Date</label>
-                      <input type="date" required value={endDate} onChange={e => setEndDate(e.target.value)} className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50 text-sm font-semibold" />
+                      <label className="block text-xs font-bold text-slate-700 uppercase mb-1">End Date</label>
+                      <input 
+                        type="date" 
+                        required
+                        value={endDate} 
+                        onChange={e => setEndDate(e.target.value)}
+                        className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-600"
+                      />
                     </div>
                   </div>
                 )}
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">Reason for Leave</label>
-                  <input 
-                    type="text" 
-                    required 
-                    placeholder="Enter reason for HR notification" 
-                    value={leaveReason} 
-                    onChange={e => setLeaveReason(e.target.value)} 
-                    className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50 text-sm font-semibold" 
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Reason for Leave</label>
+                  <textarea 
+                    rows="3"
+                    placeholder="Enter reason..."
+                    value={leaveReason}
+                    onChange={e => setLeaveReason(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-600"
                   />
                 </div>
 
                 <button 
                   type="submit" 
                   disabled={isSendingMail}
-                  className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl shadow-lg border border-white/20 text-sm"
+                  className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl shadow-lg border border-white/20 text-sm transition"
                 >
-                  {isSendingMail ? `Sending Email to ${hrEmailAddress}...` : 'Apply Leave & Dispatch Mail to HR'}
+                  {isSendingMail ? 'Sending Notification...' : 'Submit Request'}
                 </button>
               </form>
             </div>
 
-            {/* Holidays List & Add Form */}
-            <div className="space-y-6">
-              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-                <h3 className="text-lg font-bold text-slate-800 mb-4">Official Holidays Calendar</h3>
-                <div className="space-y-3 max-h-64 overflow-y-auto pr-1">
-                  {companyHolidays.map(holiday => (
-                    <div key={holiday.id} className="flex justify-between items-center p-3.5 bg-slate-50 rounded-xl border border-slate-100">
-                      <div>
-                        <p className="font-bold text-sm text-slate-800">{holiday.title}</p>
-                        <p className="text-xs text-slate-500 font-mono mt-0.5">{holiday.date}</p>
-                      </div>
-                      <button 
-                        onClick={() => handleDeleteHoliday(holiday.id)}
-                        className="text-xs text-red-500 hover:text-red-700 font-bold px-2 py-1 rounded bg-red-50 border border-red-100"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
+            {/* Company Holidays */}
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-4">
+              <h3 className="text-lg font-bold text-slate-800 border-b border-slate-100 pb-3">Company Holiday Schedule</h3>
+              
+              <form onSubmit={handleAddHoliday} className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <input 
+                  type="date" 
+                  required 
+                  value={holidayDate} 
+                  onChange={e => setHolidayDate(e.target.value)}
+                  className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold"
+                />
+                <input 
+                  type="text" 
+                  placeholder="Holiday Title" 
+                  required 
+                  value={holidayTitle} 
+                  onChange={e => setHolidayTitle(e.target.value)}
+                  className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold"
+                />
+                <button type="submit" className="py-2 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-slate-800">
+                  + Add Holiday
+                </button>
+              </form>
 
-              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-                <h3 className="text-sm font-bold text-slate-800 mb-3">Add Custom Company Holiday</h3>
-                <form onSubmit={handleAddHoliday} className="flex gap-2">
-                  <input 
-                    type="date" 
-                    required 
-                    value={holidayDate} 
-                    onChange={e => setHolidayDate(e.target.value)} 
-                    className="p-2.5 rounded-xl border border-slate-200 bg-slate-50 text-xs font-semibold" 
-                  />
-                  <input 
-                    type="text" 
-                    required 
-                    placeholder="Holiday Title" 
-                    value={holidayTitle} 
-                    onChange={e => setHolidayTitle(e.target.value)} 
-                    className="flex-1 p-2.5 rounded-xl border border-slate-200 bg-slate-50 text-xs font-semibold" 
-                  />
-                  <button type="submit" className="px-4 py-2.5 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-slate-800">
-                    Add
-                  </button>
-                </form>
+              <div className="space-y-2 max-h-80 overflow-y-auto">
+                {companyHolidays.map(item => (
+                  <div key={item.id} className="flex justify-between items-center p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                    <div>
+                      <p className="text-xs font-bold text-slate-800">{item.title}</p>
+                      <span className="text-xs text-slate-400 font-mono">{item.date}</span>
+                    </div>
+                    <button 
+                      onClick={() => handleDeleteHoliday(item.id)}
+                      className="text-xs text-red-500 hover:underline font-bold"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
@@ -753,61 +807,36 @@ export default function App() {
 
         {/* SETTINGS TAB */}
         {activeTab === 'settings' && (
-          <div className="max-w-2xl space-y-6">
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-4">
-              <h3 className="text-lg font-bold text-slate-800 border-b border-slate-100 pb-3">HR Recipient Configuration</h3>
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-2">Target HR Email Address</label>
-                <input 
-                  type="email" 
-                  value={hrEmailAddress} 
-                  onChange={e => setHrEmailAddress(e.target.value)} 
-                  className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50 text-sm font-semibold" 
-                />
-                <p className="text-xs text-slate-400 mt-2">All leave applications and escalation reminders will be routed to this email address.</p>
-              </div>
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 max-w-xl space-y-6">
+            <h3 className="text-lg font-bold text-slate-800 border-b border-slate-100 pb-3">System Settings</h3>
+            
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase mb-2">HR Email Address</label>
+              <input 
+                type="email" 
+                value={hrEmailAddress} 
+                onChange={e => setHrEmailAddress(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-600"
+              />
             </div>
 
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-4">
-              <h3 className="text-lg font-bold text-slate-800 border-b border-slate-100 pb-3">Annual Leave Quota Adjustments</h3>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">Annual CL Quota</label>
-                  <input 
-                    type="number" 
-                    value={clQuota} 
-                    onChange={e => setClQuota(Number(e.target.value))} 
-                    className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50 text-sm font-semibold" 
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">Annual SL Quota</label>
-                  <input 
-                    type="number" 
-                    value={slQuota} 
-                    onChange={e => setSlQuota(Number(e.target.value))} 
-                    className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50 text-sm font-semibold" 
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-3">
-              <h3 className="text-lg font-bold text-slate-800 border-b border-slate-100 pb-3">Year-End Carry Forward System</h3>
-              <p className="text-xs text-slate-500 leading-relaxed">
-                Trigger annual rollover simulation. Unused Casual Leaves (CL) will carry forward, while Sick Leaves (SL) reset according to policy.
-              </p>
+            <div className="pt-4 border-t border-slate-100">
               <button 
-                onClick={handleYearEndReset}
-                className="px-4 py-3 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl text-xs shadow"
+                onClick={() => {
+                  if (window.confirm('Rollover unused CL and reset SL?')) {
+                    setClCarryForward(remainingCL);
+                    alert(`Rollover complete! ${remainingCL} CL carried forward.`);
+                  }
+                }}
+                className="w-full py-3 bg-amber-50 border border-amber-200 text-amber-800 font-bold rounded-xl text-xs hover:bg-amber-100 transition"
               >
-                🔄 Execute Year-End Rollover
+                🔄 Trigger Year-End Rollover
               </button>
             </div>
           </div>
         )}
-
       </main>
+
     </div>
   );
 }
