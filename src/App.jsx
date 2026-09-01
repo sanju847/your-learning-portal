@@ -30,26 +30,21 @@ export default function App() {
   const [loginError, setLoginError] = useState('');
   const [activeTab, setActiveTab] = useState('dashboard');
 
-  const [clQuota, setClQuota] = useState(() => Number(localStorage.getItem('ylp_cl_quota')) || 12);
-  
-  const [carryForwardHistory, setCarryForwardHistory] = useState(() => {
-    const saved = localStorage.getItem('ylp_cl_carry_history');
-    return saved ? JSON.parse(saved) : [
-      { id: 1, year: '2024', days: 10 },
-      { id: 2, year: '2025', days: 30 }
-    ];
-  });
+  // Quota & Carry Forward States (Database synced with fallback)
+  const [clQuota, setClQuota] = useState(12);
+  const [slQuota, setSlQuota] = useState(6);
+  const [sabbaticalQuota, setSabbaticalQuota] = useState(30);
+  const [carryForwardHistory, setCarryForwardHistory] = useState([
+    { id: 1, year: '2024', days: 4 },
+    { id: 2, year: '2025', days: 6 }
+  ]);
+  const [hrEmailAddress, setHrEmailAddress] = useState('sanju@yourlearnings.com');
 
   const [cfYearInput, setCfYearInput] = useState('2025');
   const [cfDaysInput, setCfDaysInput] = useState('');
 
   const clCarryForward = carryForwardHistory.reduce((acc, curr) => acc + Number(curr.days || 0), 0);
-
-  const [slQuota, setSlQuota] = useState(() => Number(localStorage.getItem('ylp_sl_quota')) || 6);
-  const [sabbaticalQuota, setSabbaticalQuota] = useState(() => Number(localStorage.getItem('ylp_sabbatical_quota')) || 30);
-
   const totalAvailableCL = clQuota + clCarryForward;
-  const [hrEmailAddress, setHrEmailAddress] = useState(() => localStorage.getItem('ylp_hr_email') || 'sanju@yourlearnings.com');
 
   const [isSendingMail, setIsSendingMail] = useState(false);
   const [isFetchingData, setIsFetchingData] = useState(false);
@@ -107,6 +102,31 @@ export default function App() {
     if (window.confetti) {
       window.confetti({ particleCount: 120, spread: 80, origin: { y: 0.6 } });
     }
+  };
+
+  // Fetch Portal Settings from Supabase DB to ensure mobile & desktop sync
+  const fetchPortalSettings = async () => {
+    const { data, error } = await supabase.from('settings').select('*').eq('id', 1).maybeSingle();
+    if (!error && data) {
+      if (data.cl_quota !== undefined) setClQuota(data.cl_quota);
+      if (data.sl_quota !== undefined) setSlQuota(data.sl_quota);
+      if (data.sabbatical_quota !== undefined) setSabbaticalQuota(data.sabbatical_quota);
+      if (data.hr_email) setHrEmailAddress(data.hr_email);
+      if (data.carry_forward) setCarryForwardHistory(data.carry_forward);
+    }
+  };
+
+  // Update Settings in Database
+  const saveSettingsToDB = async (updatedObj) => {
+    const payload = {
+      id: 1,
+      cl_quota: updatedObj.clQuota ?? clQuota,
+      sl_quota: updatedObj.slQuota ?? slQuota,
+      sabbatical_quota: updatedObj.sabbaticalQuota ?? sabbaticalQuota,
+      hr_email: updatedObj.hrEmail ?? hrEmailAddress,
+      carry_forward: updatedObj.carryForward ?? carryForwardHistory
+    };
+    await supabase.from('settings').upsert([payload]);
   };
 
   const fetchLeaves = async (showLoading = false) => {
@@ -190,6 +210,7 @@ export default function App() {
   useEffect(() => {
     if (isLoggedIn) {
       fetchLeaves();
+      fetchPortalSettings();
 
       const pollInterval = setInterval(() => {
         fetchLeaves(false);
@@ -199,6 +220,9 @@ export default function App() {
         .channel('schema-db-changes')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'leaves' }, () => {
           fetchLeaves(false);
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, () => {
+          fetchPortalSettings();
         })
         .subscribe();
 
@@ -227,13 +251,8 @@ export default function App() {
 
   useEffect(() => {
     localStorage.setItem('ylp_isLoggedIn', isLoggedIn ? 'true' : 'false');
-    localStorage.setItem('ylp_cl_quota', clQuota.toString());
-    localStorage.setItem('ylp_cl_carry_history', JSON.stringify(carryForwardHistory));
-    localStorage.setItem('ylp_sl_quota', slQuota.toString());
-    localStorage.setItem('ylp_sabbatical_quota', sabbaticalQuota.toString());
     localStorage.setItem('ylp_holidays', JSON.stringify(companyHolidays));
-    localStorage.setItem('ylp_hr_email', hrEmailAddress);
-  }, [isLoggedIn, clQuota, carryForwardHistory, slQuota, sabbaticalQuota, companyHolidays, hrEmailAddress]);
+  }, [isLoggedIn, companyHolidays]);
 
   const speakWelcomeMessage = () => {
     if ('speechSynthesis' in window) {
@@ -254,15 +273,19 @@ export default function App() {
   const handleAddCarryForward = (e) => {
     e.preventDefault();
     if (!cfYearInput || !cfDaysInput) return alert('Fill both Year and Days');
-    setCarryForwardHistory([
+    const updatedHistory = [
       ...carryForwardHistory,
       { id: Date.now(), year: cfYearInput, days: Number(cfDaysInput) }
-    ]);
+    ];
+    setCarryForwardHistory(updatedHistory);
+    saveSettingsToDB({ carryForward: updatedHistory });
     setCfDaysInput('');
   };
 
   const handleDeleteCarryForward = (id) => {
-    setCarryForwardHistory(carryForwardHistory.filter(item => item.id !== id));
+    const updatedHistory = carryForwardHistory.filter(item => item.id !== id);
+    setCarryForwardHistory(updatedHistory);
+    saveSettingsToDB({ carryForward: updatedHistory });
   };
 
   const sendRealMailToHR = async (mailPayload) => {
@@ -485,16 +508,12 @@ export default function App() {
     );
   }
 
-  // --- LOGIN VIEW: Clean Static Card + Magnific Style 3D Studio Showcase Background ---
+  // --- LOGIN VIEW ---
   if (!isLoggedIn) {
     return (
       <div className="min-h-screen w-full flex items-center justify-center bg-[#05060f] p-4 relative overflow-hidden select-none">
-        
-        {/* MAGNIFIC-STYLE BG SHOWCASE LAYER */}
-        {/* Soft Ambient Studio Lighting Spotlight */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[600px] bg-gradient-to-tr from-indigo-900/40 via-purple-900/30 to-blue-900/20 rounded-full blur-[160px] pointer-events-none"></div>
 
-        {/* 3D Floor Perspective Grid (Showroom Floor) */}
         <div 
           className="absolute inset-0 opacity-25 pointer-events-none"
           style={{
@@ -505,14 +524,10 @@ export default function App() {
           }}
         ></div>
 
-        {/* Soft Glowing Ambient Orbs */}
         <div className="absolute left-10 top-1/4 w-32 h-32 bg-purple-600/30 rounded-full blur-2xl"></div>
         <div className="absolute right-12 bottom-1/4 w-40 h-40 bg-cyan-500/30 rounded-full blur-2xl"></div>
 
-        {/* STATIC ACCESSIBLE LOGIN CARD CONTAINER */}
         <div className="w-full max-w-4xl bg-[#0e1322]/90 backdrop-blur-xl rounded-3xl shadow-[0_30px_90px_rgba(0,0,0,0.8)] border border-white/10 overflow-hidden flex flex-col md:flex-row relative z-10">
-          
-          {/* Left Side: Ken Burns Image Slider */}
           <div className="w-full md:w-1/2 relative flex flex-col justify-between p-6 md:p-10 text-white overflow-hidden min-h-[300px] md:min-h-[460px]">
             {bgImages.map((img, i) => (
               <div
@@ -541,7 +556,6 @@ export default function App() {
             </div>
           </div>
 
-          {/* Right Side: Straightforward Functional Sign-In Form */}
           <div className="w-full md:w-1/2 bg-[#090d16] p-6 md:p-10 flex flex-col justify-center border-t md:border-t-0 md:border-l border-white/10">
             <div className="mb-6">
               <h3 className="text-2xl md:text-3xl font-black text-white tracking-tight">Sign In</h3>
@@ -970,7 +984,10 @@ export default function App() {
                 <input 
                   type="email" 
                   value={hrEmailAddress}
-                  onChange={e => setHrEmailAddress(e.target.value)}
+                  onChange={e => {
+                    setHrEmailAddress(e.target.value);
+                    saveSettingsToDB({ hrEmail: e.target.value });
+                  }}
                   className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 font-semibold text-sm focus:outline-none focus:ring-2 focus:ring-indigo-600"
                 />
               </div>
@@ -1024,7 +1041,11 @@ export default function App() {
                   <input 
                     type="number" 
                     value={clQuota}
-                    onChange={e => setClQuota(Number(e.target.value))}
+                    onChange={e => {
+                      const val = Number(e.target.value);
+                      setClQuota(val);
+                      saveSettingsToDB({ clQuota: val });
+                    }}
                     className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 font-semibold text-sm"
                   />
                 </div>
@@ -1033,7 +1054,11 @@ export default function App() {
                   <input 
                     type="number" 
                     value={slQuota}
-                    onChange={e => setSlQuota(Number(e.target.value))}
+                    onChange={e => {
+                      const val = Number(e.target.value);
+                      setSlQuota(val);
+                      saveSettingsToDB({ slQuota: val });
+                    }}
                     className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 font-semibold text-sm"
                   />
                 </div>
@@ -1042,7 +1067,11 @@ export default function App() {
                   <input 
                     type="number" 
                     value={sabbaticalQuota}
-                    onChange={e => setSabbaticalQuota(Number(e.target.value))}
+                    onChange={e => {
+                      const val = Number(e.target.value);
+                      setSabbaticalQuota(val);
+                      saveSettingsToDB({ sabbaticalQuota: val });
+                    }}
                     className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 font-semibold text-sm"
                   />
                 </div>
