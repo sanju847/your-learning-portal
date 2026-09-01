@@ -53,7 +53,11 @@ export default function App() {
   const [currentMailData, setCurrentMailData] = useState(null);
 
   const [appliedLeaves, setAppliedLeaves] = useState([]);
+  const [attendanceRecords, setAttendanceRecords] = useState([]);
   const [reminderSentMap, setReminderSentMap] = useState({});
+
+  const [extraWorkDate, setExtraWorkDate] = useState('');
+  const [extraWorkReason, setExtraWorkReason] = useState('');
 
   const prevLeavesMapRef = useRef({});
 
@@ -162,6 +166,13 @@ export default function App() {
     }
   };
 
+  const fetchAttendance = async () => {
+    const { data, error } = await supabase.from('attendance').select('*').order('date', { ascending: false });
+    if (!error && data) {
+      setAttendanceRecords(data);
+    }
+  };
+
   // EMAIL APPROVAL / REJECTION URL HANDLER WITH SINGLE-ACTION LOCK
   useEffect(() => {
     const handleUrlAction = async () => {
@@ -214,10 +225,12 @@ export default function App() {
   useEffect(() => {
     if (isLoggedIn) {
       fetchLeaves();
+      fetchAttendance();
       fetchPortalSettings();
 
       const pollInterval = setInterval(() => {
         fetchLeaves(false);
+        fetchAttendance();
       }, 5000);
 
       const channel = supabase
@@ -227,6 +240,9 @@ export default function App() {
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, () => {
           fetchPortalSettings();
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'attendance' }, () => {
+          fetchAttendance();
         })
         .subscribe();
 
@@ -266,6 +282,44 @@ export default function App() {
     }
   };
 
+  const todayStr = new Date().toISOString().split('T')[0];
+  const todayRecord = attendanceRecords.find(r => r.date === todayStr);
+
+  const markTodayAttendance = async () => {
+    const today = new Date();
+    const dayNum = today.getDay();
+    const isWeekend = dayNum === 0 || dayNum === 6;
+
+    const payload = {
+      date: todayStr,
+      status: 'Present',
+      type: isWeekend ? 'Extra Weekend Work' : 'Regular Workday',
+      note: isWeekend ? 'Weekend Duty' : 'Standard Present'
+    };
+
+    await supabase.from('attendance').upsert([payload], { onConflict: 'date' });
+    fetchAttendance();
+    alert("✓ Today's Attendance Marked Successfully!");
+  };
+
+  const handleAddExtraWork = async (e) => {
+    e.preventDefault();
+    if (!extraWorkDate) return alert("Select Date");
+    
+    const payload = {
+      date: extraWorkDate,
+      status: 'Present',
+      type: 'Extra Working Day',
+      note: extraWorkReason || 'Overtime / Weekend Work'
+    };
+
+    await supabase.from('attendance').upsert([payload], { onConflict: 'date' });
+    setExtraWorkDate('');
+    setExtraWorkReason('');
+    fetchAttendance();
+    alert("Extra Working Day Logged!");
+  };
+
   const usedCL = appliedLeaves.filter(i => i.category === 'CL' && i.status === 'Approved').reduce((s, i) => s + (i.days_count || 1), 0);
   const usedSL = appliedLeaves.filter(i => i.category === 'SL' && i.status === 'Approved').reduce((s, i) => s + (i.days_count || 1), 0);
   const usedSabbatical = appliedLeaves.filter(i => i.category === 'Sabbatical' && i.status === 'Approved').reduce((s, i) => s + (i.days_count || 1), 0);
@@ -273,6 +327,16 @@ export default function App() {
   const remainingCL = totalAvailableCL - usedCL;
   const remainingSL = slQuota - usedSL;
   const remainingSabbatical = sabbaticalQuota - usedSabbatical;
+
+  const currentMonth = new Date().getMonth();
+  const currentYear = new Date().getFullYear();
+
+  const currentMonthAttendance = attendanceRecords.filter(r => {
+    const d = new Date(r.date);
+    return d.getMonth() === currentMonth && d.getFullYear() === currentYear && r.status === 'Present';
+  });
+
+  const extraDaysCount = currentMonthAttendance.filter(r => r.type === 'Extra Working Day' || r.type === 'Extra Weekend Work').length;
 
   const handleAddCarryForward = (e) => {
     e.preventDefault();
@@ -660,6 +724,12 @@ export default function App() {
               📊 <span>Dashboard</span>
             </button>
             <button 
+              onClick={() => setActiveTab('attendance')}
+              className={`whitespace-nowrap flex-1 md:w-full flex items-center justify-center md:justify-start gap-2 px-3 py-2.5 rounded-xl text-xs font-bold transition ${activeTab === 'attendance' ? 'bg-indigo-600 text-white shadow-lg' : 'hover:bg-slate-900 text-slate-400'}`}
+            >
+              🕒 <span>Attendance</span>
+            </button>
+            <button 
               onClick={() => setActiveTab('calendar')}
               className={`whitespace-nowrap flex-1 md:w-full flex items-center justify-center md:justify-start gap-2 px-3 py-2.5 rounded-xl text-xs font-bold transition ${activeTab === 'calendar' ? 'bg-indigo-600 text-white shadow-lg' : 'hover:bg-slate-900 text-slate-400'}`}
             >
@@ -691,15 +761,40 @@ export default function App() {
             <h1 className="text-xl md:text-2xl font-extrabold text-slate-900">Welcome, {currentUser.name}</h1>
             <p className="text-xs text-slate-500 font-semibold mt-0.5">{currentUser.employeeId} | Joined: {currentUser.joiningDate}</p>
           </div>
-          <span className="text-[11px] text-slate-400 font-semibold bg-white px-3 py-1.5 rounded-lg border border-slate-200">
-            Last Sync: {lastSyncedTime || 'Just now'}
-          </span>
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={markTodayAttendance} 
+              disabled={!!todayRecord} 
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition shadow-sm ${todayRecord ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-indigo-600 text-white hover:bg-indigo-500'}`}
+            >
+              {todayRecord ? '✓ Marked Present Today' : '📍 Mark Attendance Today'}
+            </button>
+            <span className="text-[11px] text-slate-400 font-semibold bg-white px-3 py-1.5 rounded-lg border border-slate-200">
+              Last Sync: {lastSyncedTime || 'Just now'}
+            </span>
+          </div>
         </header>
 
         {/* DASHBOARD TAB */}
         {activeTab === 'dashboard' && (
           <div className="space-y-6">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                <p className="text-xs font-bold text-slate-400 uppercase mb-1">MONTHLY PRESENTS</p>
+                <div className="flex justify-between items-end">
+                  <span className="text-3xl font-black text-emerald-600">{currentMonthAttendance.length}</span>
+                  <span className="text-xs text-slate-400 font-semibold">Days Logged</span>
+                </div>
+              </div>
+
+              <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                <p className="text-xs font-bold text-slate-400 uppercase mb-1">EXTRA WORK DAYS</p>
+                <div className="flex justify-between items-end">
+                  <span className="text-3xl font-black text-amber-600">{extraDaysCount}</span>
+                  <span className="text-xs text-slate-400 font-semibold">Weekend Working</span>
+                </div>
+              </div>
+
               <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
                 <p className="text-xs font-bold text-slate-400 uppercase mb-1">CASUAL LEAVE (CL)</p>
                 <div className="flex justify-between items-end mb-3">
@@ -728,20 +823,6 @@ export default function App() {
                 <div className="flex justify-between items-end">
                   <span className="text-3xl font-black text-rose-500">{remainingSL}</span>
                   <span className="text-xs text-slate-400 font-semibold">of {slQuota} Days Left</span>
-                </div>
-              </div>
-
-              <div className={`p-5 rounded-2xl shadow-sm border ${isSabbaticalEligible ? 'bg-amber-50/50 border-amber-200' : 'bg-slate-100 border-slate-200 opacity-60'}`}>
-                <p className="text-xs font-bold text-amber-700 uppercase mb-1">⭐ SABBATICAL (3 YRS)</p>
-                <div className="flex justify-between items-end">
-                  <span className="text-3xl font-black text-amber-600">{remainingSabbatical}</span>
-                </div>
-              </div>
-
-              <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
-                <p className="text-xs font-bold text-slate-400 uppercase mb-1">TOTAL LEAVES USED</p>
-                <div className="flex justify-between items-end">
-                  <span className="text-3xl font-black text-emerald-600">{usedCL + usedSL + usedSabbatical}</span>
                 </div>
               </div>
             </div>
@@ -816,6 +897,56 @@ export default function App() {
                   </tbody>
                 </table>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* ATTENDANCE TAB */}
+        {activeTab === 'attendance' && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2 bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+              <h3 className="text-lg font-extrabold text-slate-900 mb-4">Attendance History Log</h3>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="border-b border-slate-200 text-slate-400 font-bold uppercase">
+                      <th className="py-3 px-2">Date</th>
+                      <th className="py-3 px-2">Status</th>
+                      <th className="py-3 px-2">Work Type</th>
+                      <th className="py-3 px-2">Note</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {attendanceRecords.length === 0 ? (
+                      <tr><td colSpan="4" className="py-4 text-center text-slate-400">No attendance marked yet.</td></tr>
+                    ) : (
+                      attendanceRecords.map(r => (
+                        <tr key={r.id || r.date}>
+                          <td className="py-3 px-2 font-bold">{r.date}</td>
+                          <td className="py-3 px-2"><span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded font-bold">{r.status}</span></td>
+                          <td className="py-3 px-2 font-semibold text-slate-600">{r.type}</td>
+                          <td className="py-3 px-2 text-slate-500">{r.note}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 space-y-4">
+              <h3 className="text-lg font-extrabold text-slate-900">Log Extra Weekend Working</h3>
+              <form onSubmit={handleAddExtraWork} className="space-y-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Date</label>
+                  <input type="date" value={extraWorkDate} onChange={e => setExtraWorkDate(e.target.value)} className="w-full px-3 py-2 bg-slate-50 border rounded-xl text-xs font-semibold" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Reason / Note</label>
+                  <input type="text" placeholder="e.g. Overtime duty" value={extraWorkReason} onChange={e => setExtraWorkReason(e.target.value)} className="w-full px-3 py-2 bg-slate-50 border rounded-xl text-xs font-semibold" />
+                </div>
+                <button type="submit" className="w-full py-2.5 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-xl text-xs transition">Log Extra Work Day</button>
+              </form>
             </div>
           </div>
         )}
