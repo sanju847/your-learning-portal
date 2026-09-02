@@ -49,14 +49,11 @@ export default function App() {
   const [loginError, setLoginError] = useState('');
   const [activeTab, setActiveTab] = useState('dashboard');
 
-  // Center Toast Notification & Custom Delete Modal States
   const [toastNotification, setToastNotification] = useState({ show: false, title: '', message: '' });
   const [deleteCandidateDate, setDeleteCandidateDate] = useState(null);
 
-  // Sync Calendar Loader State
   const [isSyncing, setIsSyncing] = useState(false);
 
-  // Blacklist state to stop Auto-Mark Absent from regenerating deleted entries
   const [deletedDates, setDeletedDates] = useState(() => {
     const saved = localStorage.getItem('ylp_deleted_attendance_dates');
     return saved ? JSON.parse(saved) : [];
@@ -66,7 +63,6 @@ export default function App() {
     localStorage.setItem('ylp_deleted_attendance_dates', JSON.stringify(deletedDates));
   }, [deletedDates]);
 
-  // Quota & Carry Forward States
   const [clQuota, setClQuota] = useState(12);
   const [slQuota, setSlQuota] = useState(6);
   const [sabbaticalQuota, setSabbaticalQuota] = useState(30);
@@ -95,7 +91,6 @@ export default function App() {
   const [extraWorkDate, setExtraWorkDate] = useState('');
   const [extraWorkReason, setExtraWorkReason] = useState('');
 
-  // Calendar State
   const [selectedCalendarDate, setSelectedCalendarDate] = useState(new Date().toISOString().split('T')[0]);
   const [calendarViewMonth, setCalendarViewMonth] = useState(new Date().getMonth());
   const [calendarViewYear, setCalendarViewYear] = useState(new Date().getFullYear());
@@ -121,7 +116,6 @@ export default function App() {
   const VALID_PASS = 'Admin@321';
   const JOINING_DATE = '2023-01-01';
 
-  // Smooth Center Toast Helper
   const triggerToast = (title, message) => {
     setToastNotification({ show: true, title, message });
     setTimeout(() => {
@@ -216,7 +210,6 @@ export default function App() {
     }
   };
 
-  // SYNC CALENDAR HANDLER
   const handleSyncCalendar = async () => {
     setIsSyncing(true);
     try {
@@ -733,7 +726,6 @@ export default function App() {
     );
   };
 
-  // ACTION SCREENS (HR / OWNER RESPONSE)
   if (hrActionState) {
     return (
       <div className="min-h-screen w-full flex items-center justify-center bg-slate-950 p-4 font-sans">
@@ -786,7 +778,6 @@ export default function App() {
     );
   }
 
-  // LOGIN VIEW
   if (!isLoggedIn) {
     return (
       <div className="min-h-screen w-full flex items-center justify-center bg-[#05060f] p-4 relative overflow-hidden select-none">
@@ -871,11 +862,9 @@ export default function App() {
     );
   }
 
-  // MAIN SYSTEM APP
   return (
     <div className="min-h-screen w-full flex flex-col md:flex-row bg-slate-100 font-sans overflow-x-hidden relative">
       
-      {/* --- CENTER CLEAN TOAST NOTIFICATION --- */}
       {toastNotification.show && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/30 backdrop-blur-xs transition-opacity duration-200">
           <div className="bg-slate-900 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-4 border border-slate-700 max-w-sm">
@@ -890,7 +879,6 @@ export default function App() {
         </div>
       )}
 
-      {/* --- DELETE CONFIRMATION MODAL --- */}
       {deleteCandidateDate && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm transition-all">
           <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl border border-slate-100 text-center">
@@ -1017,7 +1005,6 @@ export default function App() {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             
-            {/* SYNC CALENDAR BUTTON */}
             <button 
               onClick={handleSyncCalendar}
               disabled={isSyncing}
@@ -1040,42 +1027,45 @@ export default function App() {
           </div>
         </header>
 
-        {/* DASHBOARD TAB - FIXED 5 COLUMNS GRID */}
+        {/* DASHBOARD TAB - HARD-LOCKED 5 COLUMNS VIA INLINE CSS */}
         {activeTab === 'dashboard' && (
           <div className="space-y-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+            <div 
+              className="grid gap-4"
+              style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}
+            >
               
-              <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
-                <p className="text-xs font-bold text-slate-400 uppercase mb-1">MONTHLY PRESENTS</p>
+              <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-col justify-between">
+                <p className="text-[11px] font-bold text-slate-400 uppercase mb-1">MONTHLY PRESENTS</p>
                 <div className="flex justify-between items-end">
                   <span className="text-3xl font-black text-emerald-600">{currentMonthAttendance.length}</span>
                   <span className="text-xs text-slate-400 font-semibold">Days Logged</span>
                 </div>
               </div>
 
-              <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
-                <p className="text-xs font-bold text-slate-400 uppercase mb-1">EXTRA WORK DAYS</p>
+              <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-col justify-between">
+                <p className="text-[11px] font-bold text-slate-400 uppercase mb-1">EXTRA WORK DAYS</p>
                 <div className="flex justify-between items-end">
                   <span className="text-3xl font-black text-amber-600">{extraDaysCount}</span>
                   <span className="text-xs text-slate-400 font-semibold">Weekend Working</span>
                 </div>
               </div>
 
-              <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
-                <p className="text-xs font-bold text-slate-400 uppercase mb-1">CASUAL LEAVE (CL)</p>
-                <div className="flex justify-between items-end mb-3">
+              <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-col justify-between">
+                <p className="text-[11px] font-bold text-slate-400 uppercase mb-1">CASUAL LEAVE (CL)</p>
+                <div className="flex justify-between items-end mb-2">
                   <span className="text-3xl font-black text-indigo-600">{remainingCL}</span>
                   <span className="text-xs text-slate-400 font-semibold">of {totalAvailableCL} Total</span>
                 </div>
                 
-                <div className="border-t border-slate-100 pt-2.5">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase mb-1.5">Carry Forward Breakdown:</p>
+                <div className="border-t border-slate-100 pt-2">
+                  <p className="text-[9px] font-bold text-slate-400 uppercase mb-1">Carry Forward Breakdown:</p>
                   <div className="flex flex-wrap gap-1">
                     {carryForwardHistory.length === 0 ? (
                       <span className="text-xs text-slate-400 italic">No carry forward</span>
                     ) : (
                       carryForwardHistory.map(item => (
-                        <span key={item.id} className="px-2 py-0.5 bg-indigo-50 border border-indigo-100 text-indigo-700 text-[10px] font-bold rounded-md">
+                        <span key={item.id} className="px-1.5 py-0.5 bg-indigo-50 border border-indigo-100 text-indigo-700 text-[9px] font-bold rounded">
                           {item.year}: {item.days}D
                         </span>
                       ))
@@ -1084,22 +1074,22 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
-                <p className="text-xs font-bold text-slate-400 uppercase mb-1">SICK LEAVE (SL)</p>
+              <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-col justify-between">
+                <p className="text-[11px] font-bold text-slate-400 uppercase mb-1">SICK LEAVE (SL)</p>
                 <div className="flex justify-between items-end">
                   <span className="text-3xl font-black text-rose-500">{remainingSL}</span>
                   <span className="text-xs text-slate-400 font-semibold">of {slQuota} Days Left</span>
                 </div>
               </div>
 
-              {/* SABBATICAL LEAVE CARD VISIBLE IN TOP GRID */}
-              <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
-                <p className="text-xs font-bold text-slate-400 uppercase mb-1">SABBATICAL LEAVE</p>
+              {/* SABBATICAL CARD WITH GUARANTEED RENDERING */}
+              <div className="bg-white p-4 rounded-2xl shadow-sm border border-purple-200 bg-purple-50/20 flex flex-col justify-between">
+                <p className="text-[11px] font-bold text-purple-700 uppercase mb-1">SABBATICAL LEAVE</p>
                 <div className="flex justify-between items-end mb-2">
                   <span className="text-3xl font-black text-purple-600">{remainingSabbatical}</span>
-                  <span className="text-xs text-slate-400 font-semibold">of {sabbaticalQuota} Days Left</span>
+                  <span className="text-xs text-slate-500 font-semibold">of {sabbaticalQuota} Days</span>
                 </div>
-                <div className="border-t border-slate-100 pt-2 text-[11px] font-bold">
+                <div className="border-t border-purple-100 pt-2 text-[10px] font-bold">
                   {isSabbaticalEligible ? (
                     <span className="text-emerald-600">✅ Eligible (3+ Yrs Tenure)</span>
                   ) : (
