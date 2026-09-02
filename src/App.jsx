@@ -216,7 +216,7 @@ export default function App() {
     }
   };
 
-  // SYNC CALENDAR HANDLER (Refreshes DB, Holidays & Attendance)
+  // SYNC CALENDAR HANDLER
   const handleSyncCalendar = async () => {
     setIsSyncing(true);
     try {
@@ -226,12 +226,11 @@ export default function App() {
       triggerToast("Calendar Synced!", "All holidays, leaves & attendance data updated.");
     } catch (err) {
       triggerToast("Sync Failed", "Could not sync database records.");
-    } fontinally {
+    } finally {
       setTimeout(() => setIsSyncing(false), 600);
     }
   };
 
-  // Fixed Auto-Mark Absent (Honors Deleted Blacklist)
   const checkAndAutoMarkAbsent = async (currentRecords) => {
     const today = new Date();
     const recordsMap = new Set(currentRecords.map(r => r.date));
@@ -369,7 +368,6 @@ export default function App() {
   const todayStr = new Date().toISOString().split('T')[0];
   const todayRecord = attendanceRecords.find(r => r.date === todayStr);
 
-  // MARK ATTENDANCE BY CALENDAR / ANY SPECIFIC DATE
   const handleMarkDateAttendance = async (targetDate) => {
     const d = new Date(targetDate);
     const dayNum = d.getDay();
@@ -396,7 +394,6 @@ export default function App() {
     }
   };
 
-  // PERMANENT DELETE HANDLER
   const confirmPermanentDelete = async () => {
     if (!deleteCandidateDate) return;
     const dateStr = deleteCandidateDate;
@@ -649,7 +646,6 @@ export default function App() {
     localStorage.setItem('ylp_holidays', JSON.stringify(updated));
   };
 
-  // CALENDAR GENERATOR HELPER WITH HOLIDAY BADGES
   const renderInteractiveCalendar = () => {
     const daysInMonth = new Date(calendarViewYear, calendarViewMonth + 1, 0).getDate();
     const firstDayIndex = new Date(calendarViewYear, calendarViewMonth, 1).getDay();
@@ -1044,10 +1040,11 @@ export default function App() {
           </div>
         </header>
 
-        {/* DASHBOARD TAB */}
+        {/* DASHBOARD TAB - FIXED 5 COLUMNS GRID */}
         {activeTab === 'dashboard' && (
           <div className="space-y-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+              
               <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
                 <p className="text-xs font-bold text-slate-400 uppercase mb-1">MONTHLY PRESENTS</p>
                 <div className="flex justify-between items-end">
@@ -1095,17 +1092,22 @@ export default function App() {
                 </div>
               </div>
 
-              {/* SABBATICAL LEAVE CARD */}
+              {/* SABBATICAL LEAVE CARD VISIBLE IN TOP GRID */}
               <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
                 <p className="text-xs font-bold text-slate-400 uppercase mb-1">SABBATICAL LEAVE</p>
-                <div className="flex justify-between items-end">
+                <div className="flex justify-between items-end mb-2">
                   <span className="text-3xl font-black text-purple-600">{remainingSabbatical}</span>
                   <span className="text-xs text-slate-400 font-semibold">of {sabbaticalQuota} Days Left</span>
                 </div>
-                <p className="text-[10px] font-semibold text-slate-400 mt-2">
-                  {isSabbaticalEligible ? '✅ Eligible (3+ Yrs)' : '🔒 Locked (< 3 Yrs)'}
-                </p>
+                <div className="border-t border-slate-100 pt-2 text-[11px] font-bold">
+                  {isSabbaticalEligible ? (
+                    <span className="text-emerald-600">✅ Eligible (3+ Yrs Tenure)</span>
+                  ) : (
+                    <span className="text-rose-500">🔒 Locked (&lt; 3 Yrs Tenure)</span>
+                  )}
+                </div>
               </div>
+
             </div>
 
             <div className="bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-slate-200">
@@ -1186,12 +1188,11 @@ export default function App() {
           </div>
         )}
 
-        {/* ATTENDANCE TAB WITH LIVE CALENDAR & DELETE BUTTON */}
+        {/* ATTENDANCE TAB */}
         {activeTab === 'attendance' && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2 space-y-6">
               
-              {/* INTERACTIVE CALENDAR FOR BACK-DATE ATTENDANCE */}
               <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-4">
                   <div>
@@ -1209,7 +1210,6 @@ export default function App() {
                 {renderInteractiveCalendar()}
               </div>
 
-              {/* TABLE WITH DELETE BUTTON ACCESSIBLE ON DASHBOARD */}
               <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
                 <h3 className="text-lg font-extrabold text-slate-900 mb-4">Attendance History Log</h3>
                 <div className="overflow-x-auto">
