@@ -226,7 +226,7 @@ export default function App() {
       triggerToast("Calendar Synced!", "All holidays, leaves & attendance data updated.");
     } catch (err) {
       triggerToast("Sync Failed", "Could not sync database records.");
-    } finally {
+    } fontinally {
       setTimeout(() => setIsSyncing(false), 600);
     }
   };
@@ -445,7 +445,7 @@ export default function App() {
 
   const remainingCL = totalAvailableCL - usedCL;
   const remainingSL = slQuota - usedSL;
-  const remainingSabbatical = sabbaticalQuota - usedSabbatical;
+  const remainingSabbatical = isSabbaticalEligible ? (sabbaticalQuota - usedSabbatical) : 0;
 
   const currentMonth = new Date().getMonth();
   const currentYear = new Date().getFullYear();
@@ -1047,7 +1047,7 @@ export default function App() {
         {/* DASHBOARD TAB */}
         {activeTab === 'dashboard' && (
           <div className="space-y-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
               <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
                 <p className="text-xs font-bold text-slate-400 uppercase mb-1">MONTHLY PRESENTS</p>
                 <div className="flex justify-between items-end">
@@ -1094,6 +1094,18 @@ export default function App() {
                   <span className="text-xs text-slate-400 font-semibold">of {slQuota} Days Left</span>
                 </div>
               </div>
+
+              {/* SABBATICAL LEAVE CARD */}
+              <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                <p className="text-xs font-bold text-slate-400 uppercase mb-1">SABBATICAL LEAVE</p>
+                <div className="flex justify-between items-end">
+                  <span className="text-3xl font-black text-purple-600">{remainingSabbatical}</span>
+                  <span className="text-xs text-slate-400 font-semibold">of {sabbaticalQuota} Days Left</span>
+                </div>
+                <p className="text-[10px] font-semibold text-slate-400 mt-2">
+                  {isSabbaticalEligible ? '✅ Eligible (3+ Yrs)' : '🔒 Locked (< 3 Yrs)'}
+                </p>
+              </div>
             </div>
 
             <div className="bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-slate-200">
@@ -1131,7 +1143,11 @@ export default function App() {
                       appliedLeaves.map(item => (
                         <tr key={item.id} className="hover:bg-slate-50 transition">
                           <td className="py-3 px-3 font-bold">
-                            <span className={`px-2 py-0.5 rounded text-[11px] ${item.category === 'CL' ? 'bg-indigo-100 text-indigo-700' : item.category === 'SL' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-800 font-extrabold'}`}>
+                            <span className={`px-2 py-0.5 rounded text-[11px] ${
+                              item.category === 'Sabbatical' ? 'bg-purple-100 text-purple-700' :
+                              item.category === 'CL' ? 'bg-indigo-100 text-indigo-700' : 
+                              item.category === 'SL' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-800 font-extrabold'
+                            }`}>
                               {item.category}
                             </span>
                           </td>
